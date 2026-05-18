@@ -1,12 +1,11 @@
 using NovaSpark.Mods;
-using NovaSpark.Powerups;
 using UnityEngine;
 
 namespace NovaSpark.Game
 {
-    // Phase 0a content-loading choice: ScriptableObject instances live under
-    // Assets/_Project/Content/Resources/<Type>/ so Resources.LoadAll<T>("") finds them
-    // in builds without an Addressables dependency. Will be revisited if/when
+    // Phase 0 content-loading choice: ScriptableObject instances live under
+    // Assets/_Project/Content/Resources/<Type>/ so Resources.LoadAll<T> finds them
+    // in player builds without an Addressables dependency. Will be revisited if/when
     // Addressables or runtime JSON mod loading becomes necessary.
     [DefaultExecutionOrder(-1000)]
     public sealed class Bootstrap : MonoBehaviour
@@ -14,16 +13,19 @@ namespace NovaSpark.Game
         private void Awake()
         {
             ContentRegistry.Clear();
-            LoadAllPowerups();
+            LoadAllContent();
             LogRegisteredContent();
         }
 
-        private static void LoadAllPowerups()
+        private static void LoadAllContent()
         {
-            var defs = Resources.LoadAll<PowerupDefinition>(string.Empty);
-            foreach (var def in defs)
+            var all = Resources.LoadAll<ScriptableObject>(string.Empty);
+            foreach (var so in all)
             {
-                ContentRegistry.Register(def);
+                if (so is IContentDefinition def)
+                {
+                    ContentRegistry.Register(def);
+                }
             }
         }
 
