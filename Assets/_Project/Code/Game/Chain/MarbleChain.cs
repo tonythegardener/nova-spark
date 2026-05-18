@@ -82,23 +82,34 @@ namespace NovaSpark.Game.Chain
             return marble;
         }
 
+        // Phase 1a model: spawn pressure drives the chain from the TAIL.
+        // The tail (last spawned, lowest arc) advances at ChainAdvanceSpeed.
+        // Each marble closer to the head has a natural arc = trailing.arc + spacing.
+        // - If a marble is at or below its natural arc, snap forward (spawn pressure pushing).
+        // - If a marble is above its natural arc (a gap exists from a match), it retreats
+        //   at CatchUpSpeedMultiplier * speed until reconnected.
+        // Effect: matches push the leading portion of the chain physically back toward
+        // the spawn end, fitting the 'fleet being repelled' theme.
         private void AdvanceChain(float dt)
         {
             if (_marbles.Count == 0) return;
-            _marbles[0].ArcLength += _level.ChainAdvanceSpeed * dt;
-            float catchUp = _level.ChainAdvanceSpeed * _level.CatchUpSpeedMultiplier * dt;
 
-            for (int i = 1; i < _marbles.Count; i++)
+            int tail = _marbles.Count - 1;
+            _marbles[tail].ArcLength += _level.ChainAdvanceSpeed * dt;
+
+            float retreatStep = _level.ChainAdvanceSpeed * _level.CatchUpSpeedMultiplier * dt;
+
+            for (int i = tail - 1; i >= 0; i--)
             {
-                float natural = _marbles[i - 1].ArcLength - _level.MarbleSpacing;
+                float natural = _marbles[i + 1].ArcLength + _level.MarbleSpacing;
                 float current = _marbles[i].ArcLength;
-                if (current >= natural)
+                if (current <= natural)
                 {
                     _marbles[i].ArcLength = natural;
                 }
                 else
                 {
-                    _marbles[i].ArcLength = Mathf.Min(natural, current + catchUp);
+                    _marbles[i].ArcLength = Mathf.Max(natural, current - retreatStep);
                 }
             }
         }

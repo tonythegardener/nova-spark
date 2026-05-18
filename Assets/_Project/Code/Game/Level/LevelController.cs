@@ -1,98 +1,164 @@
+using System.Collections.Generic;
 using NovaSpark.Core;
 using NovaSpark.Game.Chain;
 using NovaSpark.Game.Shooter;
 using NovaSpark.Mods;
 using UnityEngine;
-using UnityEngine.SceneManagement;
+using UnityEngine.InputSystem;
 
 namespace NovaSpark.Game.Level
 {
     public sealed class LevelController : MonoBehaviour
     {
-        [Tooltip("Content id of the level to load. Must be present in the ContentRegistry at Start.")]
-        [SerializeField] private string startLevelContentId = "level.phase0b_smoke_test";
+        private enum AppState { LevelSelect, Playing, Paused, Won, Lost }
 
+        private AppState _state = AppState.LevelSelect;
         private LevelDefinition _level;
         private PathSampler _path;
         private MarbleChain _chain;
         private Cannon _shooter;
         private Sprite _circle;
-        private LineRenderer _pathLine;
         private Camera _camera;
-
-        private enum EndState { Playing, Won, Lost }
-        private EndState _endState = EndState.Playing;
+        private Transform _levelRoot;
 
         private Vector3 _cameraHome;
         private float _shakeTimeLeft;
         private float _shakeAmplitude;
 
+        // OnGUI cached styles
+        private Texture2D _panelBg;
+        private GUIStyle _panelStyle;
+        private GUIStyle _titleStyle;
+        private GUIStyle _bodyStyle;
+        private GUIStyle _buttonStyle;
+        private bool _stylesReady;
+
         private void Start()
         {
-            _level = ContentRegistry.Get<LevelDefinition>(startLevelContentId);
-            if (_level == null)
+            _circle = SpriteFactory.GetWhiteCircle();
+            ConfigureCameraForMenu();
+            _state = AppState.LevelSelect;
+            Time.timeScale = 1f;
+        }
+
+        private void OnDestroy()
+        {
+            Time.timeScale = 1f;
+        }
+
+        // -------------------- camera --------------------
+
+        private void ConfigureCameraForMenu()
+        {
+            _camera = EnsureCamera();
+            _camera.orthographic = true;
+            _camera.orthographicSize = 6f;
+            _camera.backgroundColor = new Color(0.04f, 0.05f, 0.08f, 1f);
+            _camera.clearFlags = CameraClearFlags.SolidColor;
+            _camera.transform.position = new Vector3(0f, 0f, -10f);
+            _camera.transform.rotation = Quaternion.identity;
+            _cameraHome = _camera.transform.position;
+        }
+
+        private void ConfigureCameraForLevel(LevelDefinition level)
+        {
+            _camera = EnsureCamera();
+            _camera.orthographic = true;
+            _camera.orthographicSize = level.CameraOrthographicSize;
+            _camera.backgroundColor = level.BackgroundColor;
+            _camera.clearFlags = CameraClearFlags.SolidColor;
+            _camera.transform.position = new Vector3(level.CameraCenter.x, level.CameraCenter.y, -10f);
+            _camera.transform.rotation = Quaternion.identity;
+            _cameraHome = _camera.transform.position;
+        }
+
+        private static Camera EnsureCamera()
+        {
+            var cam = Camera.main;
+            if (cam != null) return cam;
+            var go = new GameObject("Main Camera") { tag = "MainCamera" };
+            return go.AddComponent<Camera>();
+        }
+
+        // -------------------- level lifecycle --------------------
+
+        private void LoadLevel(string contentId)
+        {
+            TearDownLevel();
+            var def = ContentRegistry.Get<LevelDefinition>(contentId);
+            if (def == null)
             {
-                Debug.LogError($"[NovaSpark] LevelController could not find level '{startLevelContentId}' in registry.");
+                Debug.LogError($"[NovaSpark] LevelController could not find level '{contentId}' in registry.");
                 return;
             }
-            _circle = SpriteFactory.GetWhiteCircle();
-            _camera = ConfigureCamera(_level);
-            _cameraHome = _camera.transform.position;
+
+            _level = def;
             _path = new PathSampler(_level.Waypoints);
+            ConfigureCameraForLevel(_level);
+
+            _levelRoot = new GameObject("LevelRoot").transform;
+            _levelRoot.SetParent(transform, false);
 
             BuildPathVisual();
             BuildBastionMarker();
             BuildChain();
-            BuildShooter();
+            BuildCannon();
 
+            _state = AppState.Playing;
+            Time.timeScale = 1f;
             Debug.Log($"[NovaSpark] Level '{_level.DisplayName}' started: path length {_path.TotalLength:F2}, " +
                       $"speed {_level.ChainAdvanceSpeed}, marbles {_level.TotalMarbles}");
         }
 
-        private Camera ConfigureCamera(LevelDefinition level)
+        private void TearDownLevel()
         {
-            var cam = Camera.main;
-            if (cam == null)
+            if (_levelRoot != null)
             {
-                var go = new GameObject("Main Camera");
-                go.tag = "MainCamera";
-                cam = go.AddComponent<Camera>();
+                Destroy(_levelRoot.gameObject);
+                _levelRoot = null;
             }
-            cam.orthographic = true;
-            cam.orthographicSize = level.CameraOrthographicSize;
-            cam.backgroundColor = level.BackgroundColor;
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.transform.position = new Vector3(level.CameraCenter.x, level.CameraCenter.y, -10f);
-            cam.transform.rotation = Quaternion.identity;
-            return cam;
+            _chain = null;
+            _shooter = null;
+            _path = null;
+            _level = null;
         }
+
+        private void GoToLevelSelect()
+        {
+            TearDownLevel();
+            ConfigureCameraForMenu();
+            _state = AppState.LevelSelect;
+            Time.timeScale = 1f;
+        }
+
+        // -------------------- builders --------------------
 
         private void BuildPathVisual()
         {
             var go = new GameObject("PathVisual");
-            go.transform.SetParent(transform, false);
-            _pathLine = go.AddComponent<LineRenderer>();
-            _pathLine.useWorldSpace = true;
-            _pathLine.positionCount = _path.Points.Count;
+            go.transform.SetParent(_levelRoot, false);
+            var line = go.AddComponent<LineRenderer>();
+            line.useWorldSpace = true;
+            line.positionCount = _path.Points.Count;
             for (int i = 0; i < _path.Points.Count; i++)
             {
-                _pathLine.SetPosition(i, _path.Points[i]);
+                line.SetPosition(i, _path.Points[i]);
             }
-            _pathLine.startWidth = _level.MarbleRadius * 2.05f;
-            _pathLine.endWidth = _level.MarbleRadius * 2.05f;
+            line.startWidth = _level.MarbleRadius * 2.05f;
+            line.endWidth = _level.MarbleRadius * 2.05f;
             var mat = new Material(Shader.Find("Sprites/Default"));
             mat.color = new Color(0.13f, 0.16f, 0.22f, 1f);
-            _pathLine.material = mat;
-            _pathLine.sortingOrder = -10;
-            _pathLine.numCornerVertices = 4;
-            _pathLine.numCapVertices = 4;
+            line.material = mat;
+            line.sortingOrder = -10;
+            line.numCornerVertices = 4;
+            line.numCapVertices = 4;
         }
 
         private void BuildBastionMarker()
         {
             var bastionPos = _path.Points[_path.Points.Count - 1];
             var go = new GameObject("Bastion");
-            go.transform.SetParent(transform, false);
+            go.transform.SetParent(_levelRoot, false);
             go.transform.position = bastionPos;
             go.transform.localScale = Vector3.one * (_level.MarbleRadius * 3.2f);
             var sr = go.AddComponent<SpriteRenderer>();
@@ -104,7 +170,7 @@ namespace NovaSpark.Game.Level
         private void BuildChain()
         {
             var chainGo = new GameObject("MarbleChain");
-            chainGo.transform.SetParent(transform, false);
+            chainGo.transform.SetParent(_levelRoot, false);
             _chain = chainGo.AddComponent<MarbleChain>();
             _chain.Configure(_level, _path, _circle);
             _chain.OnReachedBastion += OnLost;
@@ -112,36 +178,84 @@ namespace NovaSpark.Game.Level
             _chain.OnMatchResolved += () => ShakeCamera(0.18f, 0.15f);
         }
 
-        private void BuildShooter()
+        private void BuildCannon()
         {
-            var shooterGo = new GameObject("Shooter");
-            shooterGo.transform.SetParent(transform, false);
+            var shooterGo = new GameObject("Cannon");
+            shooterGo.transform.SetParent(_levelRoot, false);
             _shooter = shooterGo.AddComponent<Cannon>();
             _shooter.Configure(_level, _chain, _camera, _circle);
         }
 
+        // -------------------- update / input --------------------
+
         private void Update()
         {
-            if (_endState == EndState.Playing && _chain != null && _level != null)
+            HandleEscape();
+
+            if (_state == AppState.Playing && _chain != null && _level != null)
             {
                 _chain.Tick(Time.deltaTime);
             }
             UpdateCameraShake();
         }
 
+        private void HandleEscape()
+        {
+            var kb = Keyboard.current;
+            if (kb == null) return;
+            if (!kb.escapeKey.wasPressedThisFrame) return;
+
+            switch (_state)
+            {
+                case AppState.Playing:
+                    Pause();
+                    break;
+                case AppState.Paused:
+                    Resume();
+                    break;
+                case AppState.Won:
+                case AppState.Lost:
+                    GoToLevelSelect();
+                    break;
+                case AppState.LevelSelect:
+                    // no-op; user can click Quit instead
+                    break;
+            }
+        }
+
+        private void Pause()
+        {
+            if (_state != AppState.Playing) return;
+            _state = AppState.Paused;
+            Time.timeScale = 0f;
+            if (_shooter != null) _shooter.SetFiringEnabled(false);
+        }
+
+        private void Resume()
+        {
+            if (_state != AppState.Paused) return;
+            _state = AppState.Playing;
+            Time.timeScale = 1f;
+            if (_shooter != null) _shooter.SetFiringEnabled(true);
+        }
+
+        // -------------------- end states --------------------
+
         private void OnWon()
         {
-            if (_endState != EndState.Playing) return;
-            _endState = EndState.Won;
+            if (_state != AppState.Playing) return;
+            _state = AppState.Won;
             if (_shooter != null) _shooter.SetFiringEnabled(false);
         }
 
         private void OnLost()
         {
-            if (_endState != EndState.Playing) return;
-            _endState = EndState.Lost;
+            if (_state != AppState.Playing) return;
+            _state = AppState.Lost;
             if (_shooter != null) _shooter.SetFiringEnabled(false);
         }
+
+        // -------------------- camera shake --------------------
 
         private void ShakeCamera(float duration, float amplitude)
         {
@@ -168,36 +282,146 @@ namespace NovaSpark.Game.Level
             _camera.transform.position = _cameraHome + offset;
         }
 
+        // -------------------- OnGUI --------------------
+
         private void OnGUI()
         {
-            if (_endState == EndState.Playing) return;
+            EnsureStyles();
+            switch (_state)
+            {
+                case AppState.LevelSelect: DrawLevelSelect(); break;
+                case AppState.Paused:      DrawPauseMenu();   break;
+                case AppState.Won:         DrawEndScreen(true);  break;
+                case AppState.Lost:        DrawEndScreen(false); break;
+            }
+        }
 
-            var w = Screen.width;
-            var h = Screen.height;
-            var boxRect = new Rect(w / 2f - 220, h / 2f - 90, 440, 180);
+        private void DrawLevelSelect()
+        {
+            var levels = new List<LevelDefinition>(ContentRegistry.All<LevelDefinition>());
+            levels.Sort((a, b) => string.CompareOrdinal(a.ContentId, b.ContentId));
 
-            var bgStyle = new GUIStyle(GUI.skin.box);
-            bgStyle.normal.background = MakeSolid(new Color(0f, 0f, 0f, 0.78f));
-            bgStyle.normal.textColor = Color.white;
-            GUI.Box(boxRect, GUIContent.none, bgStyle);
+            int rowH = 56;
+            int rowGap = 8;
+            int contentH = 110 + levels.Count * (rowH + rowGap) + 70;
+            int contentW = 520;
+            var boxRect = CenteredBox(contentW, contentH);
 
-            var title = _endState == EndState.Won ? "Sector cleared" : "Bastion overrun";
-            var titleStyle = new GUIStyle(GUI.skin.label)
+            GUI.Box(boxRect, GUIContent.none, _panelStyle);
+            GUI.Label(new Rect(boxRect.x, boxRect.y + 22, boxRect.width, 50),
+                "NOVA SPARK", _titleStyle);
+            GUI.Label(new Rect(boxRect.x, boxRect.y + 68, boxRect.width, 30),
+                "Select a sector", _bodyStyle);
+
+            int y = (int)boxRect.y + 110;
+            foreach (var lv in levels)
+            {
+                var label = $"{lv.DisplayName}\n<size=12>{lv.ContentId}</size>";
+                var btnRect = new Rect(boxRect.x + 30, y, boxRect.width - 60, rowH);
+                if (GUI.Button(btnRect, label, _buttonStyle))
+                {
+                    LoadLevel(lv.ContentId);
+                }
+                y += rowH + rowGap;
+            }
+
+            var quitRect = new Rect(boxRect.x + boxRect.width / 2f - 80, y + 8, 160, 44);
+            if (GUI.Button(quitRect, "Quit", _buttonStyle))
+            {
+                QuitApp();
+            }
+        }
+
+        private void DrawPauseMenu()
+        {
+            int w = 440, h = 260;
+            var boxRect = CenteredBox(w, h);
+            GUI.Box(boxRect, GUIContent.none, _panelStyle);
+
+            var titleColor = new Color(0.85f, 0.90f, 0.95f);
+            DrawTitle(boxRect, "Paused", titleColor);
+
+            int btnW = 220, btnH = 44, gap = 10;
+            int by = (int)boxRect.y + 95;
+            int bx = (int)boxRect.x + (int)((boxRect.width - btnW) / 2);
+
+            if (GUI.Button(new Rect(bx, by, btnW, btnH), "Resume", _buttonStyle))
+            {
+                Resume();
+            }
+            by += btnH + gap;
+            if (GUI.Button(new Rect(bx, by, btnW, btnH), "Restart Level", _buttonStyle))
+            {
+                var id = _level != null ? _level.ContentId : null;
+                if (!string.IsNullOrEmpty(id)) LoadLevel(id);
+            }
+            by += btnH + gap;
+            if (GUI.Button(new Rect(bx, by, btnW, btnH), "Quit to Level Select", _buttonStyle))
+            {
+                GoToLevelSelect();
+            }
+        }
+
+        private void DrawEndScreen(bool won)
+        {
+            int w = 460, h = 240;
+            var boxRect = CenteredBox(w, h);
+            GUI.Box(boxRect, GUIContent.none, _panelStyle);
+
+            var title = won ? "Sector cleared" : "Bastion overrun";
+            var color = won
+                ? new Color(0.55f, 0.95f, 0.65f)
+                : new Color(0.95f, 0.55f, 0.55f);
+            DrawTitle(boxRect, title, color);
+
+            int btnW = 220, btnH = 44, gap = 10;
+            int by = (int)boxRect.y + 95;
+            int bx = (int)boxRect.x + (int)((boxRect.width - btnW) / 2);
+            if (GUI.Button(new Rect(bx, by, btnW, btnH), "Replay Level", _buttonStyle))
+            {
+                if (_level != null) LoadLevel(_level.ContentId);
+            }
+            by += btnH + gap;
+            if (GUI.Button(new Rect(bx, by, btnW, btnH), "Level Select", _buttonStyle))
+            {
+                GoToLevelSelect();
+            }
+        }
+
+        // -------------------- gui helpers --------------------
+
+        private void EnsureStyles()
+        {
+            if (_stylesReady) return;
+            _panelBg = MakeSolid(new Color(0f, 0f, 0f, 0.85f));
+            _panelStyle = new GUIStyle(GUI.skin.box);
+            _panelStyle.normal.background = _panelBg;
+            _panelStyle.padding = new RectOffset(20, 20, 20, 20);
+
+            _titleStyle = new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
                 fontSize = 28,
                 fontStyle = FontStyle.Bold,
+                richText = true,
             };
-            titleStyle.normal.textColor = _endState == EndState.Won
-                ? new Color(0.55f, 0.95f, 0.65f)
-                : new Color(0.95f, 0.55f, 0.55f);
-            GUI.Label(new Rect(boxRect.x, boxRect.y + 18, boxRect.width, 50), title, titleStyle);
+            _titleStyle.normal.textColor = Color.white;
 
-            var buttonStyle = new GUIStyle(GUI.skin.button) { fontSize = 18 };
-            if (GUI.Button(new Rect(boxRect.x + 130, boxRect.y + 100, 180, 50), "Restart", buttonStyle))
+            _bodyStyle = new GUIStyle(GUI.skin.label)
             {
-                Restart();
-            }
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = 16,
+                richText = true,
+            };
+            _bodyStyle.normal.textColor = new Color(0.7f, 0.75f, 0.85f, 1f);
+
+            _buttonStyle = new GUIStyle(GUI.skin.button)
+            {
+                fontSize = 16,
+                alignment = TextAnchor.MiddleCenter,
+                richText = true,
+            };
+            _stylesReady = true;
         }
 
         private static Texture2D MakeSolid(Color c)
@@ -208,10 +432,27 @@ namespace NovaSpark.Game.Level
             return tex;
         }
 
-        private void Restart()
+        private static Rect CenteredBox(int width, int height)
         {
-            var active = SceneManager.GetActiveScene();
-            SceneManager.LoadScene(active.buildIndex);
+            return new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
+        }
+
+        private void DrawTitle(Rect boxRect, string title, Color color)
+        {
+            var style = new GUIStyle(_titleStyle);
+            style.normal.textColor = color;
+            GUI.Label(new Rect(boxRect.x, boxRect.y + 28, boxRect.width, 50), title, style);
+        }
+
+        // -------------------- quit --------------------
+
+        private static void QuitApp()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
         }
     }
 }

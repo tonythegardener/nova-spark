@@ -17,15 +17,17 @@ namespace NovaSpark.Editor
     {
         private const string BootstrapScenePath = "Assets/_Project/Scenes/Bootstrap.unity";
         private const string LaserSightAssetPath = "Assets/_Project/Content/Resources/Powerups/LaserSight.asset";
-        private const string LaserSightContentId = "powerup.laser_sight";
         private const string Phase0bLevelAssetPath = "Assets/_Project/Content/Resources/Levels/Phase0bSmokeTest.asset";
-        private const string Phase0bLevelContentId = "level.phase0b_smoke_test";
+        private const string SwitchbackLevelAssetPath = "Assets/_Project/Content/Resources/Levels/Switchback.asset";
+        private const string LongSweepLevelAssetPath = "Assets/_Project/Content/Resources/Levels/LongSweep.asset";
 
-        [MenuItem("Nova Spark/Prepare Phase 0 Assets")]
+        [MenuItem("Nova Spark/Prepare Phase 1a Assets")]
         public static void PrepareAssets()
         {
             EnsureLaserSightAsset();
             EnsurePhase0bLevelAsset();
+            EnsureSwitchbackLevelAsset();
+            EnsureLongSweepLevelAsset();
             EnsureBootstrapScene();
             ConfigureBuildSettings();
             AssetDatabase.SaveAssets();
@@ -45,15 +47,20 @@ namespace NovaSpark.Editor
             BuildWindowsTo("Builds/Phase0b/NovaSpark.exe");
         }
 
+        [MenuItem("Nova Spark/Build Windows (Phase 1a)")]
+        public static void BuildWindowsPhase1a()
+        {
+            PrepareAssets();
+            BuildWindowsTo("Builds/Phase1a/NovaSpark.exe");
+        }
+
         public static void BuildWindowsPhase0aCli() => RunCli(BuildWindowsPhase0a);
         public static void BuildWindowsPhase0bCli() => RunCli(BuildWindowsPhase0b);
+        public static void BuildWindowsPhase1aCli() => RunCli(BuildWindowsPhase1a);
 
         private static void RunCli(Action action)
         {
-            try
-            {
-                action();
-            }
+            try { action(); }
             catch (Exception ex)
             {
                 Debug.LogError($"[NovaSpark.Build] FAILED: {ex}");
@@ -63,15 +70,16 @@ namespace NovaSpark.Editor
             EditorApplication.Exit(0);
         }
 
+        // -------------------- powerup assets --------------------
+
         private static void EnsureLaserSightAsset()
         {
             EnsureAssetFolders(LaserSightAssetPath);
-
             var existing = AssetDatabase.LoadAssetAtPath<PowerupDefinition>(LaserSightAssetPath);
             if (existing != null) return;
 
             var so = ScriptableObject.CreateInstance<PowerupDefinition>();
-            SetPrivate(so, "contentId", LaserSightContentId);
+            SetPrivate(so, "contentId", "powerup.laser_sight");
             SetPrivate(so, "displayName", "Laser Sight");
             SetPrivate(so, "description", "Shows shot trajectory line with bounces.");
             SetPrivate(so, "magnitude", 1f);
@@ -81,53 +89,142 @@ namespace NovaSpark.Editor
             Debug.Log($"[NovaSpark.Build] Created LaserSight asset at {LaserSightAssetPath}");
         }
 
+        // -------------------- level assets --------------------
+
         private static void EnsurePhase0bLevelAsset()
         {
-            EnsureAssetFolders(Phase0bLevelAssetPath);
+            EnsureLevelAsset(Phase0bLevelAssetPath, level =>
+            {
+                SetPrivate(level, "contentId", "level.phase0b_smoke_test");
+                SetPrivate(level, "schemaVersion", 1);
+                SetPrivate(level, "displayName", "Smoke Test (gentle S)");
+                SetPrivate(level, "waypoints", new List<Vector2>
+                {
+                    new(-8.5f,  3.5f),
+                    new(-3.0f,  3.5f),
+                    new(-1.0f,  2.0f),
+                    new( 0.0f,  0.0f),
+                    new( 1.0f, -2.0f),
+                    new( 3.0f, -2.5f),
+                    new( 8.5f, -2.5f),
+                });
 
-            var existing = AssetDatabase.LoadAssetAtPath<LevelDefinition>(Phase0bLevelAssetPath);
+                SetPrivate(level, "totalMarbles", 28);
+                SetPrivate(level, "spawnIntervalSeconds", 0.30f);
+                SetPrivate(level, "chainAdvanceSpeed", 1.25f);
+                SetPrivate(level, "marbleSpacing", 0.62f);
+                SetPrivate(level, "catchUpSpeedMultiplier", 3f);
+                SetPrivate(level, "marbleRadius", 0.32f);
+
+                SetPrivate(level, "shooterPosition", new Vector2(0f, -4.2f));
+                SetPrivate(level, "shotVelocity", 18f);
+                SetPrivate(level, "shooterCooldown", 0.10f);
+                SetPrivate(level, "projectileRadius", 0.25f);
+
+                SetPrivate(level, "matchThreshold", 3);
+
+                SetPrivate(level, "cameraOrthographicSize", 5.5f);
+                SetPrivate(level, "cameraCenter", new Vector2(0f, 0f));
+                SetPrivate(level, "backgroundColor", new Color(0.05f, 0.06f, 0.10f, 1f));
+            });
+        }
+
+        private static void EnsureSwitchbackLevelAsset()
+        {
+            EnsureLevelAsset(SwitchbackLevelAssetPath, level =>
+            {
+                SetPrivate(level, "contentId", "level.switchback");
+                SetPrivate(level, "schemaVersion", 1);
+                SetPrivate(level, "displayName", "Switchback (sharp Z)");
+                SetPrivate(level, "waypoints", new List<Vector2>
+                {
+                    new(-9.0f,  3.5f),
+                    new( 4.0f,  3.5f),
+                    new( 4.0f,  0.5f),
+                    new(-4.0f,  0.5f),
+                    new(-4.0f, -3.0f),
+                    new( 8.5f, -3.0f),
+                });
+
+                SetPrivate(level, "totalMarbles", 36);
+                SetPrivate(level, "spawnIntervalSeconds", 0.25f);
+                SetPrivate(level, "chainAdvanceSpeed", 1.45f);
+                SetPrivate(level, "marbleSpacing", 0.58f);
+                SetPrivate(level, "catchUpSpeedMultiplier", 3f);
+                SetPrivate(level, "marbleRadius", 0.30f);
+
+                SetPrivate(level, "shooterPosition", new Vector2(0f, -4.4f));
+                SetPrivate(level, "shotVelocity", 19f);
+                SetPrivate(level, "shooterCooldown", 0.09f);
+                SetPrivate(level, "projectileRadius", 0.24f);
+
+                SetPrivate(level, "matchThreshold", 3);
+
+                SetPrivate(level, "cameraOrthographicSize", 5.6f);
+                SetPrivate(level, "cameraCenter", new Vector2(0f, 0f));
+                SetPrivate(level, "backgroundColor", new Color(0.07f, 0.05f, 0.10f, 1f));
+            });
+        }
+
+        private static void EnsureLongSweepLevelAsset()
+        {
+            EnsureLevelAsset(LongSweepLevelAssetPath, level =>
+            {
+                SetPrivate(level, "contentId", "level.long_sweep");
+                SetPrivate(level, "schemaVersion", 1);
+                SetPrivate(level, "displayName", "Long Sweep (wide arc)");
+                SetPrivate(level, "waypoints", new List<Vector2>
+                {
+                    new(-10.0f, -1.0f),
+                    new( -9.5f,  2.0f),
+                    new( -7.0f,  3.6f),
+                    new( -2.0f,  4.0f),
+                    new(  3.0f,  3.6f),
+                    new(  7.0f,  2.0f),
+                    new(  9.5f, -1.0f),
+                    new(  9.0f, -3.0f),
+                    new(  3.0f, -3.6f),
+                    new( -3.0f, -3.6f),
+                    new( -8.0f, -3.0f),
+                });
+
+                SetPrivate(level, "totalMarbles", 44);
+                SetPrivate(level, "spawnIntervalSeconds", 0.28f);
+                SetPrivate(level, "chainAdvanceSpeed", 0.95f);
+                SetPrivate(level, "marbleSpacing", 0.60f);
+                SetPrivate(level, "catchUpSpeedMultiplier", 3f);
+                SetPrivate(level, "marbleRadius", 0.30f);
+
+                SetPrivate(level, "shooterPosition", new Vector2(0f, 0f));
+                SetPrivate(level, "shotVelocity", 17f);
+                SetPrivate(level, "shooterCooldown", 0.10f);
+                SetPrivate(level, "projectileRadius", 0.24f);
+
+                SetPrivate(level, "matchThreshold", 3);
+
+                SetPrivate(level, "cameraOrthographicSize", 6.0f);
+                SetPrivate(level, "cameraCenter", new Vector2(0f, 0f));
+                SetPrivate(level, "backgroundColor", new Color(0.04f, 0.08f, 0.10f, 1f));
+            });
+        }
+
+        private static void EnsureLevelAsset(string assetPath, Action<LevelDefinition> configure)
+        {
+            EnsureAssetFolders(assetPath);
+            var existing = AssetDatabase.LoadAssetAtPath<LevelDefinition>(assetPath);
             if (existing != null)
             {
-                Debug.Log($"[NovaSpark.Build] Existing Phase 0b level at {Phase0bLevelAssetPath}");
+                Debug.Log($"[NovaSpark.Build] Existing level at {assetPath}");
                 return;
             }
 
             var level = ScriptableObject.CreateInstance<LevelDefinition>();
-            SetPrivate(level, "contentId", Phase0bLevelContentId);
-            SetPrivate(level, "schemaVersion", 1);
-            SetPrivate(level, "displayName", "Phase 0b — Smoke Test");
-            SetPrivate(level, "waypoints", new List<Vector2>
-            {
-                new(-8.5f,  3.5f),
-                new(-3.0f,  3.5f),
-                new(-1.0f,  2.0f),
-                new( 0.0f,  0.0f),
-                new( 1.0f, -2.0f),
-                new( 3.0f, -2.5f),
-                new( 8.5f, -2.5f),
-            });
-
-            SetPrivate(level, "totalMarbles", 28);
-            SetPrivate(level, "spawnIntervalSeconds", 0.30f);
-            SetPrivate(level, "chainAdvanceSpeed", 1.25f);
-            SetPrivate(level, "marbleSpacing", 0.62f);
-            SetPrivate(level, "catchUpSpeedMultiplier", 3f);
-            SetPrivate(level, "marbleRadius", 0.32f);
-
-            SetPrivate(level, "shooterPosition", new Vector2(0f, -4.2f));
-            SetPrivate(level, "shotVelocity", 18f);
-            SetPrivate(level, "shooterCooldown", 0.10f);
-            SetPrivate(level, "projectileRadius", 0.25f);
-
-            SetPrivate(level, "matchThreshold", 3);
-
-            SetPrivate(level, "cameraOrthographicSize", 5.5f);
-            SetPrivate(level, "cameraCenter", new Vector2(0f, 0f));
-            SetPrivate(level, "backgroundColor", new Color(0.05f, 0.06f, 0.10f, 1f));
-
-            AssetDatabase.CreateAsset(level, Phase0bLevelAssetPath);
-            Debug.Log($"[NovaSpark.Build] Created Phase 0b level asset at {Phase0bLevelAssetPath}");
+            configure(level);
+            AssetDatabase.CreateAsset(level, assetPath);
+            Debug.Log($"[NovaSpark.Build] Created level asset at {assetPath}");
         }
+
+        // -------------------- scene --------------------
 
         private static void EnsureBootstrapScene()
         {
@@ -151,8 +248,9 @@ namespace NovaSpark.Editor
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, BootstrapScenePath);
-            if (created) Debug.Log($"[NovaSpark.Build] Created Bootstrap scene at {BootstrapScenePath}");
-            else Debug.Log($"[NovaSpark.Build] Updated Bootstrap scene at {BootstrapScenePath}");
+            Debug.Log(created
+                ? $"[NovaSpark.Build] Created Bootstrap scene at {BootstrapScenePath}"
+                : $"[NovaSpark.Build] Updated Bootstrap scene at {BootstrapScenePath}");
         }
 
         private static GameObject FindOrCreateBootstrapObject(UnityEngine.SceneManagement.Scene scene)
@@ -175,6 +273,8 @@ namespace NovaSpark.Editor
             EditorBuildSettings.scenes = scenes;
             Debug.Log("[NovaSpark.Build] EditorBuildSettings.scenes configured.");
         }
+
+        // -------------------- build --------------------
 
         private static void BuildWindowsTo(string outputRelativePath)
         {
@@ -202,6 +302,8 @@ namespace NovaSpark.Editor
                 throw new Exception($"Build did not succeed: {summary.result}");
             }
         }
+
+        // -------------------- helpers --------------------
 
         private static void EnsureAssetFolders(string assetPath)
         {
