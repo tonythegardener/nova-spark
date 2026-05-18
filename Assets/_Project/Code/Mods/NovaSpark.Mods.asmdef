@@ -1,0 +1,16 @@
+{
+    "name": "NovaSpark.Mods",
+    "rootNamespace": "NovaSpark.Mods",
+    "references": [
+        "NovaSpark.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

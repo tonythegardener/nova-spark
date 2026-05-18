@@ -1,0 +1,17 @@
+{
+    "name": "NovaSpark.Powerups",
+    "rootNamespace": "NovaSpark.Powerups",
+    "references": [
+        "NovaSpark.Core",
+        "NovaSpark.Mods"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
