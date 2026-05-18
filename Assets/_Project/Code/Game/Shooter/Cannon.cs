@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using NovaSpark.Core;
 using NovaSpark.Game.Chain;
 using NovaSpark.Game.Level;
@@ -23,6 +25,10 @@ namespace NovaSpark.Game.Shooter
         private Transform _barrelPivot;
         private SpriteRenderer _nextPreviewRenderer;
 
+        // Scratch buffer for picking a random color from the active set without
+        // allocating each call.
+        private readonly List<MarbleColor> _scratchColors = new();
+
         public void Configure(LevelDefinition level, MarbleChain chain, Camera cam, Sprite sprite)
         {
             _level = level;
@@ -30,10 +36,17 @@ namespace NovaSpark.Game.Shooter
             _camera = cam;
             _sprite = sprite;
             BuildVisuals();
-            _currentColor = RandomColor();
-            _nextColor = RandomColor();
+            _currentColor = PickColor();
+            _nextColor = PickColor();
             RefreshChamberColors();
             _firingEnabled = true;
+
+            if (_chain != null) _chain.OnChainChanged += OnChainChanged;
+        }
+
+        private void OnDestroy()
+        {
+            if (_chain != null) _chain.OnChainChanged -= OnChainChanged;
         }
 
         public void SetFiringEnabled(bool enabled) => _firingEnabled = enabled;
@@ -53,10 +66,31 @@ namespace NovaSpark.Game.Shooter
             float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - 90f;
             _barrelPivot.rotation = Quaternion.Euler(0f, 0f, angle);
 
+            // Swap chambered with next on RMB or Tab. Free action — no cooldown.
+            if (_firingEnabled && SwapShotPressed())
+            {
+                SwapShot();
+            }
+
             if (_firingEnabled && mouse.leftButton.wasPressedThisFrame && _cooldownRemaining <= 0f)
             {
                 Fire(dir);
             }
+        }
+
+        private static bool SwapShotPressed()
+        {
+            var mouse = Mouse.current;
+            if (mouse != null && mouse.rightButton.wasPressedThisFrame) return true;
+            var kb = Keyboard.current;
+            if (kb != null && kb.tabKey.wasPressedThisFrame) return true;
+            return false;
+        }
+
+        private void SwapShot()
+        {
+            (_currentColor, _nextColor) = (_nextColor, _currentColor);
+            RefreshChamberColors();
         }
 
         private Vector2 ReadMouseWorld(Mouse mouse)
@@ -80,12 +114,64 @@ namespace NovaSpark.Game.Shooter
             p.Launch(_currentColor, dir * _level.ShotVelocity, _level.ProjectileRadius, _sprite, _chain);
 
             _currentColor = _nextColor;
-            _nextColor = RandomColor();
+            _nextColor = PickColor();
             RefreshChamberColors();
         }
 
-        private MarbleColor RandomColor()
+        // Called whenever the chain mutates (spawn/insert/match).
+        // Ensures chambered + next-queued colors only exist in the chain.
+        private void OnChainChanged()
         {
+            if (_chain == null) return;
+            var active = _chain.ActiveColors();
+            if (active.Count == 0) return; // chain empty (probably mid-clear); leave colors alone
+
+            bool changed = false;
+            if (!active.Contains(_currentColor))
+            {
+                _currentColor = PickFromActiveSet(active, _nextColor);
+                changed = true;
+            }
+            if (!active.Contains(_nextColor))
+            {
+                _nextColor = PickFromActiveSet(active, _currentColor);
+                changed = true;
+            }
+            if (changed) RefreshChamberColors();
+        }
+
+        // Returns a random color from the active set. Avoids `avoid` if possible
+        // so chambered and next don't redundantly match.
+        private MarbleColor PickFromActiveSet(IReadOnlyCollection<MarbleColor> active, MarbleColor avoid)
+        {
+            _scratchColors.Clear();
+            foreach (var c in active)
+            {
+                if (c != avoid) _scratchColors.Add(c);
+            }
+            if (_scratchColors.Count == 0)
+            {
+                // Only one color in the chain — match it.
+                foreach (var c in active) return c;
+            }
+            return _scratchColors[Random.Range(0, _scratchColors.Count)];
+        }
+
+        // Pick a random color the cannon may chamber. Prefers a color present in
+        // the chain; falls back to the level's allowed palette when the chain is
+        // empty (early game before first spawn, or briefly mid-clear).
+        private MarbleColor PickColor()
+        {
+            if (_chain != null)
+            {
+                var active = _chain.ActiveColors();
+                if (active.Count > 0)
+                {
+                    _scratchColors.Clear();
+                    foreach (var c in active) _scratchColors.Add(c);
+                    return _scratchColors[Random.Range(0, _scratchColors.Count)];
+                }
+            }
             return _level.AllowedColors[Random.Range(0, _level.AllowedColors.Length)];
         }
 

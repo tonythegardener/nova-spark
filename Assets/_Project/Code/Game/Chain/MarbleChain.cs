@@ -23,6 +23,22 @@ namespace NovaSpark.Game.Chain
         public System.Action OnReachedBastion;
         public System.Action OnCleared;
         public System.Action<Vector2, MarbleColor> OnMarbleDestroyed;
+        // Fired after any change to the marble list (spawn, insert, destroy).
+        // Subscribers can re-query ActiveColors() to keep palettes in sync.
+        public System.Action OnChainChanged;
+
+        // Pre-allocated set reused by ActiveColors to avoid per-frame garbage.
+        private readonly HashSet<MarbleColor> _activeColorsScratch = new();
+
+        public IReadOnlyCollection<MarbleColor> ActiveColors()
+        {
+            _activeColorsScratch.Clear();
+            for (int i = 0; i < _marbles.Count; i++)
+            {
+                _activeColorsScratch.Add(_marbles[i].Color);
+            }
+            return _activeColorsScratch;
+        }
 
         public void Configure(LevelDefinition level, PathSampler path, Sprite sprite)
         {
@@ -67,6 +83,7 @@ namespace NovaSpark.Game.Chain
             _marbles.Add(marble);
             _spawnedCount++;
             if (_spawnedCount >= _level.TotalMarbles) _spawnComplete = true;
+            OnChainChanged?.Invoke();
         }
 
         private ChainMarble CreateMarble(MarbleColor color, float arc, int sortingOrder)
@@ -157,6 +174,7 @@ namespace NovaSpark.Game.Chain
                     _marbles[i].ArcLength = natural;
             }
 
+            OnChainChanged?.Invoke();
             return true;
         }
 
@@ -203,6 +221,7 @@ namespace NovaSpark.Game.Chain
             }
 
             OnMatchResolved?.Invoke();
+            OnChainChanged?.Invoke();
         }
 
         private void CheckEndConditions()

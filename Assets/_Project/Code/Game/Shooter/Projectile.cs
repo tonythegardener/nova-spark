@@ -14,6 +14,7 @@ namespace NovaSpark.Game.Shooter
         private MarbleChain _chain;
         private float _maxLifetime;
         private float _age;
+        private bool _consumed;
 
         public MarbleColor Color => _color;
 
@@ -55,12 +56,28 @@ namespace NovaSpark.Game.Shooter
 
         private void OnCollisionEnter2D(Collision2D collision)
         {
+            // Guard: Unity can deliver more than one collision event before
+            // Destroy(gameObject) takes effect at end-of-frame (penetration into
+            // a second collider, multiple contact points on the same marble, or
+            // the inserted marble's collider overlapping ours on the next physics
+            // step). Without this flag, the projectile could insert twice — the
+            // 'ghost marble' bug Tony reported.
+            if (_consumed) return;
+
             var hit = collision.collider.GetComponentInParent<ChainMarble>();
             if (hit == null) return;
-            if (_chain == null) { Destroy(gameObject); return; }
+            if (_chain == null) { _consumed = true; Destroy(gameObject); return; }
 
+            _consumed = true;
             var velocity = _rb != null ? _rb.linearVelocity : Vector2.zero;
             _chain.TryInsertAt(hit, velocity, _color);
+
+            // Disable collider immediately so any further physics step this frame
+            // can't fire another collision before Destroy lands.
+            var col = GetComponent<CircleCollider2D>();
+            if (col != null) col.enabled = false;
+            if (_rb != null) _rb.linearVelocity = Vector2.zero;
+
             Destroy(gameObject);
         }
     }
