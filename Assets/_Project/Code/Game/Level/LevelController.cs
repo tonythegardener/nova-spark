@@ -1,8 +1,10 @@
 using System.Collections.Generic;
 using NovaSpark.Core;
 using NovaSpark.Game.Chain;
+using NovaSpark.Game.Powerups;
 using NovaSpark.Game.Shooter;
 using NovaSpark.Mods;
+using NovaSpark.Powerups;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -184,6 +186,16 @@ namespace NovaSpark.Game.Level
             shooterGo.transform.SetParent(_levelRoot, false);
             _shooter = shooterGo.AddComponent<Cannon>();
             _shooter.Configure(_level, _chain, _camera, _circle);
+
+            // Phase 1b.1 debug: auto-equip every registered PowerupDefinition so
+            // Tony can see all effects active in the playtest. The draft loop
+            // (RunState + Draft UI) lands in 1b.2; until then this is the visible
+            // proof that the framework works.
+            var ctx = new PowerupContext(_level, _chain, _camera, _shooter, _shooter.BarrelMuzzle);
+            foreach (var def in ContentRegistry.All<PowerupDefinition>())
+            {
+                _shooter.EquipPowerup(def, ctx);
+            }
         }
 
         // -------------------- update / input --------------------

@@ -29,11 +29,11 @@ MonoBehaviour:
   marbleSpacing: 0.62
   catchUpSpeedMultiplier: 3
   marbleRadius: 0.32
-  shooterPosition: {x: 0, y: -4.2}
+  shooterPosition: {x: 0, y: -5}
   shotVelocity: 18
   shooterCooldown: 0.1
   projectileRadius: 0.25
   matchThreshold: 3
-  cameraOrthographicSize: 5.5
+  cameraOrthographicSize: 6
   cameraCenter: {x: 0, y: 0}
   backgroundColor: {r: 0.05, g: 0.06, b: 0.1, a: 1}

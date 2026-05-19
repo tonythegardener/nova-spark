@@ -17,14 +17,18 @@ namespace NovaSpark.Editor
     {
         private const string BootstrapScenePath = "Assets/_Project/Scenes/Bootstrap.unity";
         private const string LaserSightAssetPath = "Assets/_Project/Content/Resources/Powerups/LaserSight.asset";
+        private const string RapidReloadAssetPath = "Assets/_Project/Content/Resources/Powerups/RapidReload.asset";
+        private const string LongScopeAssetPath = "Assets/_Project/Content/Resources/Powerups/LongScope.asset";
         private const string Phase0bLevelAssetPath = "Assets/_Project/Content/Resources/Levels/Phase0bSmokeTest.asset";
         private const string SwitchbackLevelAssetPath = "Assets/_Project/Content/Resources/Levels/Switchback.asset";
         private const string LongSweepLevelAssetPath = "Assets/_Project/Content/Resources/Levels/LongSweep.asset";
 
-        [MenuItem("Nova Spark/Prepare Phase 1a Assets")]
+        [MenuItem("Nova Spark/Prepare Phase 1b Assets")]
         public static void PrepareAssets()
         {
             EnsureLaserSightAsset();
+            EnsureRapidReloadAsset();
+            EnsureLongScopeAsset();
             EnsurePhase0bLevelAsset();
             EnsureSwitchbackLevelAsset();
             EnsureLongSweepLevelAsset();
@@ -54,9 +58,17 @@ namespace NovaSpark.Editor
             BuildWindowsTo("Builds/Phase1a/NovaSpark.exe");
         }
 
+        [MenuItem("Nova Spark/Build Windows (Phase 1b)")]
+        public static void BuildWindowsPhase1b()
+        {
+            PrepareAssets();
+            BuildWindowsTo("Builds/Phase1b/NovaSpark.exe");
+        }
+
         public static void BuildWindowsPhase0aCli() => RunCli(BuildWindowsPhase0a);
         public static void BuildWindowsPhase0bCli() => RunCli(BuildWindowsPhase0b);
         public static void BuildWindowsPhase1aCli() => RunCli(BuildWindowsPhase1a);
+        public static void BuildWindowsPhase1bCli() => RunCli(BuildWindowsPhase1b);
 
         private static void RunCli(Action action)
         {
@@ -74,19 +86,62 @@ namespace NovaSpark.Editor
 
         private static void EnsureLaserSightAsset()
         {
-            EnsureAssetFolders(LaserSightAssetPath);
-            var existing = AssetDatabase.LoadAssetAtPath<PowerupDefinition>(LaserSightAssetPath);
-            if (existing != null) return;
+            EnsurePowerupAsset(LaserSightAssetPath, so =>
+            {
+                SetPrivate(so, "contentId", "powerup.laser_sight");
+                SetPrivate(so, "displayName", "Laser Sight");
+                SetPrivate(so, "description", "Projects a trajectory line from your cannon along the aim direction.");
+                SetPrivate(so, "effectKind", "laser_sight");
+                SetPrivate(so, "magnitude", 18f);   // line length in world units
+                SetPrivate(so, "schemaVersion", 1);
+            });
+        }
+
+        private static void EnsureRapidReloadAsset()
+        {
+            EnsurePowerupAsset(RapidReloadAssetPath, so =>
+            {
+                SetPrivate(so, "contentId", "powerup.rapid_reload");
+                SetPrivate(so, "displayName", "Rapid Reload");
+                SetPrivate(so, "description", "Halves the cannon's cooldown between shots.");
+                SetPrivate(so, "effectKind", "rapid_reload");
+                SetPrivate(so, "magnitude", 0.5f);  // cooldown multiplier (0.5 = 2x fire rate)
+                SetPrivate(so, "schemaVersion", 1);
+            });
+        }
+
+        private static void EnsureLongScopeAsset()
+        {
+            EnsurePowerupAsset(LongScopeAssetPath, so =>
+            {
+                SetPrivate(so, "contentId", "powerup.long_scope");
+                SetPrivate(so, "displayName", "Long Scope");
+                SetPrivate(so, "description", "Reveals additional upcoming shots in the queue.");
+                SetPrivate(so, "effectKind", "long_scope");
+                SetPrivate(so, "magnitude", 3f);    // extra preview slots (3 => total 4 previews)
+                SetPrivate(so, "schemaVersion", 1);
+            });
+        }
+
+        // Upserts a PowerupDefinition: creates the asset if missing, or applies
+        // configure() to the existing instance to keep effectKind / magnitude up
+        // to date with code changes. EditorUtility.SetDirty + SaveAssets persist.
+        private static void EnsurePowerupAsset(string assetPath, Action<PowerupDefinition> configure)
+        {
+            EnsureAssetFolders(assetPath);
+            var existing = AssetDatabase.LoadAssetAtPath<PowerupDefinition>(assetPath);
+            if (existing != null)
+            {
+                configure(existing);
+                EditorUtility.SetDirty(existing);
+                Debug.Log($"[NovaSpark.Build] Refreshed powerup asset {assetPath}");
+                return;
+            }
 
             var so = ScriptableObject.CreateInstance<PowerupDefinition>();
-            SetPrivate(so, "contentId", "powerup.laser_sight");
-            SetPrivate(so, "displayName", "Laser Sight");
-            SetPrivate(so, "description", "Shows shot trajectory line with bounces.");
-            SetPrivate(so, "magnitude", 1f);
-            SetPrivate(so, "schemaVersion", 1);
-
-            AssetDatabase.CreateAsset(so, LaserSightAssetPath);
-            Debug.Log($"[NovaSpark.Build] Created LaserSight asset at {LaserSightAssetPath}");
+            configure(so);
+            AssetDatabase.CreateAsset(so, assetPath);
+            Debug.Log($"[NovaSpark.Build] Created powerup asset {assetPath}");
         }
 
         // -------------------- level assets --------------------
@@ -116,14 +171,14 @@ namespace NovaSpark.Editor
                 SetPrivate(level, "catchUpSpeedMultiplier", 3f);
                 SetPrivate(level, "marbleRadius", 0.32f);
 
-                SetPrivate(level, "shooterPosition", new Vector2(0f, -4.2f));
+                SetPrivate(level, "shooterPosition", new Vector2(0f, -5.0f));
                 SetPrivate(level, "shotVelocity", 18f);
                 SetPrivate(level, "shooterCooldown", 0.10f);
                 SetPrivate(level, "projectileRadius", 0.25f);
 
                 SetPrivate(level, "matchThreshold", 3);
 
-                SetPrivate(level, "cameraOrthographicSize", 5.5f);
+                SetPrivate(level, "cameraOrthographicSize", 6.0f);
                 SetPrivate(level, "cameraCenter", new Vector2(0f, 0f));
                 SetPrivate(level, "backgroundColor", new Color(0.05f, 0.06f, 0.10f, 1f));
             });

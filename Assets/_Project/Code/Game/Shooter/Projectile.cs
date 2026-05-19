@@ -9,9 +9,12 @@ namespace NovaSpark.Game.Shooter
     [RequireComponent(typeof(SpriteRenderer))]
     public sealed class Projectile : MonoBehaviour
     {
+        public delegate void HitCallback(ChainMarble hit, MarbleColor color, Vector2 velocity);
+
         private MarbleColor _color;
         private Rigidbody2D _rb;
         private MarbleChain _chain;
+        private HitCallback _onHit;
         private float _maxLifetime;
         private float _age;
         private bool _consumed;
@@ -24,10 +27,12 @@ namespace NovaSpark.Game.Shooter
             float radius,
             Sprite sprite,
             MarbleChain chain,
+            HitCallback onHit = null,
             float maxLifetime = 4f)
         {
             _color = color;
             _chain = chain;
+            _onHit = onHit;
             _maxLifetime = maxLifetime;
 
             _rb = GetComponent<Rigidbody2D>();
@@ -71,6 +76,7 @@ namespace NovaSpark.Game.Shooter
             _consumed = true;
             var velocity = _rb != null ? _rb.linearVelocity : Vector2.zero;
             _chain.TryInsertAt(hit, velocity, _color);
+            _onHit?.Invoke(hit, _color, velocity);
 
             // Disable collider immediately so any further physics step this frame
             // can't fire another collision before Destroy lands.

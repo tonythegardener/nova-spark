@@ -18,15 +18,24 @@ namespace NovaSpark.Powerups
         [SerializeField, TextArea(2, 6)] private string description = "";
         [SerializeField] private Sprite icon;
 
-        [Header("Phase 0 placeholder parameters")]
-        [Tooltip("Generic numeric tuning slot. Real fields per-power-up come later.")]
+        [Header("Effect")]
+        [Tooltip("String key resolved by NovaSpark.Game.Powerups.PowerupEffects.Create. " +
+                 "Examples: laser_sight, rapid_reload, long_scope.")]
+        [SerializeField] private string effectKind = "";
+        [Tooltip("Primary numeric parameter for the effect. Interpretation depends on effectKind " +
+                 "(e.g., line length in units for laser_sight, cooldown multiplier for rapid_reload, " +
+                 "extra preview slots for long_scope).")]
         [SerializeField] private float magnitude = 1f;
+        [Tooltip("Secondary numeric parameter. Effects that need only one param ignore this.")]
+        [SerializeField] private float secondaryMagnitude = 0f;
 
         public string ContentId => contentId;
         public int SchemaVersion => schemaVersion;
         public string DisplayName => displayName;
         public string Description => description;
         public Sprite Icon => icon;
+        public string EffectKind => effectKind;
         public float Magnitude => magnitude;
+        public float SecondaryMagnitude => secondaryMagnitude;
     }
 }
