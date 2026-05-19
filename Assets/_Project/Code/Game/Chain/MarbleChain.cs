@@ -16,6 +16,16 @@ namespace NovaSpark.Game.Chain
         private float _spawnTimer;
         private bool _spawnComplete;
 
+        // Match detection is event-driven (Phase 1a.3):
+        // - TryInsertAt: directly runs a local match check around the inserted marble.
+        // - DestroyRunAround: when it destroys a run flanked by surviving marbles,
+        //   it records a "pending seam" — the head-side surviving marble. Each Tick
+        //   we check pending seams; once the gap from a destruction has closed and
+        //   the two flanking marbles touch, we re-run a local match check there.
+        //   That preserves Zuma-style cascades while never auto-eliminating
+        //   spawn-time runs of >= MatchThreshold same-color marbles.
+        private readonly List<ChainMarble> _pendingSeams = new();
+
         public IReadOnlyList<ChainMarble> Marbles => _marbles;
         public bool SpawnComplete => _spawnComplete;
         public bool ReachedBastion { get; private set; }
@@ -52,9 +62,11 @@ namespace NovaSpark.Game.Chain
             HandleSpawning(dt);
             AdvanceChain(dt);
             UpdatePositions();
-            DetectAndResolveMatches();
+            ProcessPendingSeams();
             CheckEndConditions();
         }
+
+        // -------------------- spawning --------------------
 
         private void HandleSpawning(float dt)
         {
@@ -99,14 +111,14 @@ namespace NovaSpark.Game.Chain
             return marble;
         }
 
+        // -------------------- advance --------------------
+
         // Phase 1a model: spawn pressure drives the chain from the TAIL.
         // The tail (last spawned, lowest arc) advances at ChainAdvanceSpeed.
         // Each marble closer to the head has a natural arc = trailing.arc + spacing.
         // - If a marble is at or below its natural arc, snap forward (spawn pressure pushing).
         // - If a marble is above its natural arc (a gap exists from a match), it retreats
         //   at CatchUpSpeedMultiplier * speed until reconnected.
-        // Effect: matches push the leading portion of the chain physically back toward
-        // the spawn end, fitting the 'fleet being repelled' theme.
         private void AdvanceChain(float dt)
         {
             if (_marbles.Count == 0) return;
@@ -139,6 +151,8 @@ namespace NovaSpark.Game.Chain
                 m.transform.position = _path.SampleByDistance(m.ArcLength);
             }
         }
+
+        // -------------------- insertion + match --------------------
 
         public bool TryInsertAt(ChainMarble hit, Vector2 projectileVelocity, MarbleColor newColor)
         {
@@ -175,54 +189,121 @@ namespace NovaSpark.Game.Chain
             }
 
             OnChainChanged?.Invoke();
+
+            // Local match check at the insertion site. Pure spawn never triggers
+            // matches; only insertions do.
+            ResolveMatchAround(inserted);
             return true;
         }
 
-        private void DetectAndResolveMatches()
+        // Looks for a contiguous same-color run including `origin`. Destroys it
+        // if length >= MatchThreshold, registers a pending seam, and fires events.
+        private void ResolveMatchAround(ChainMarble origin)
         {
-            if (_marbles.Count < _level.MatchThreshold) return;
+            if (origin == null) return;
+            int k = _marbles.IndexOf(origin);
+            if (k < 0) return;
 
-            float contiguityEpsilon = _level.MarbleSpacing * 0.4f;
-            int runStart = 0;
-            MarbleColor runColor = _marbles[0].Color;
+            var color = origin.Color;
 
-            var toDestroy = new List<int>();
-
-            for (int i = 1; i <= _marbles.Count; i++)
+            int left = k;
+            while (left > 0
+                   && _marbles[left - 1].Color == color
+                   && AreContiguous(_marbles[left - 1], _marbles[left]))
             {
-                bool boundary = i == _marbles.Count;
-                bool sameColor = !boundary && _marbles[i].Color == runColor;
-                bool contiguous = !boundary &&
-                    (_marbles[i - 1].ArcLength - _marbles[i].ArcLength) <= _level.MarbleSpacing + contiguityEpsilon;
-
-                if (sameColor && contiguous) continue;
-
-                int runLen = i - runStart;
-                if (runLen >= _level.MatchThreshold)
-                {
-                    for (int j = runStart; j < i; j++) toDestroy.Add(j);
-                }
-                if (!boundary)
-                {
-                    runStart = i;
-                    runColor = _marbles[i].Color;
-                }
+                left--;
+            }
+            int right = k;
+            while (right < _marbles.Count - 1
+                   && _marbles[right + 1].Color == color
+                   && AreContiguous(_marbles[right], _marbles[right + 1]))
+            {
+                right++;
             }
 
-            if (toDestroy.Count == 0) return;
+            int runLength = right - left + 1;
+            if (runLength < _level.MatchThreshold) return;
 
-            for (int i = toDestroy.Count - 1; i >= 0; i--)
+            DestroyRange(left, right);
+        }
+
+        // Destroys marbles [L..R] inclusive. If both flanks survive, records the
+        // head-side surviving marble as a pending seam so a future Tick can
+        // recheck once the gap closes (Zuma cascade behavior).
+        private void DestroyRange(int L, int R)
+        {
+            ChainMarble headSideSurvivor = L > 0 ? _marbles[L - 1] : null;
+            bool tailSideSurvivorExists = R < _marbles.Count - 1;
+
+            for (int i = R; i >= L; i--)
             {
-                var idx = toDestroy[i];
-                var m = _marbles[idx];
+                var m = _marbles[i];
                 OnMarbleDestroyed?.Invoke(m.transform.position, m.Color);
                 Destroy(m.gameObject);
-                _marbles.RemoveAt(idx);
+                _marbles.RemoveAt(i);
+            }
+
+            if (headSideSurvivor != null && tailSideSurvivorExists)
+            {
+                _pendingSeams.Add(headSideSurvivor);
             }
 
             OnMatchResolved?.Invoke();
             OnChainChanged?.Invoke();
         }
+
+        // Returns true if `headSide` and `tailSide` are adjacent in the chain
+        // and within marble-spacing arc-length of each other (i.e., the gap from
+        // an earlier destruction has closed enough for them to be touching).
+        private bool AreContiguous(ChainMarble headSide, ChainMarble tailSide)
+        {
+            float contiguityEpsilon = _level.MarbleSpacing * 0.4f;
+            return (headSide.ArcLength - tailSide.ArcLength) <= _level.MarbleSpacing + contiguityEpsilon;
+        }
+
+        // Each tick, examine seams left behind by previous destructions. When
+        // the gap has closed and the two flanking marbles match in color, run
+        // ResolveMatchAround (which may chain into more destructions).
+        private void ProcessPendingSeams()
+        {
+            if (_pendingSeams.Count == 0) return;
+
+            for (int i = _pendingSeams.Count - 1; i >= 0; i--)
+            {
+                var headSide = _pendingSeams[i];
+                if (headSide == null)
+                {
+                    _pendingSeams.RemoveAt(i);
+                    continue;
+                }
+                int idx = _marbles.IndexOf(headSide);
+                if (idx < 0 || idx + 1 >= _marbles.Count)
+                {
+                    // head-side was itself destroyed, or now sits at the tail
+                    _pendingSeams.RemoveAt(i);
+                    continue;
+                }
+
+                var tailSide = _marbles[idx + 1];
+                if (!AreContiguous(headSide, tailSide))
+                {
+                    // Gap still closing — leave the seam pending.
+                    continue;
+                }
+
+                // Gap closed. Done with this seam.
+                _pendingSeams.RemoveAt(i);
+
+                if (headSide.Color == tailSide.Color)
+                {
+                    // Cascade: maybe a longer same-color run formed. This may add
+                    // a new seam if it destroys, but never re-adds *this* one.
+                    ResolveMatchAround(headSide);
+                }
+            }
+        }
+
+        // -------------------- end conditions --------------------
 
         private void CheckEndConditions()
         {
