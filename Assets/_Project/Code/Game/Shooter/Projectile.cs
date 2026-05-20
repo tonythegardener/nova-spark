@@ -9,12 +9,17 @@ namespace NovaSpark.Game.Shooter
     [RequireComponent(typeof(SpriteRenderer))]
     public sealed class Projectile : MonoBehaviour
     {
-        public delegate void HitCallback(ChainMarble hit, MarbleColor color, Vector2 velocity);
+        // The resolver, when non-null, is given full responsibility for what
+        // happens on impact (insert, destroy radius, dislodge, etc.). When null,
+        // the projectile falls back to the chain's default insertion behavior —
+        // used by powerup effects like Knockout Round that re-launch a secondary
+        // projectile and don't want it to recurse through the cannon's effects.
+        public delegate void HitResolver(ChainMarble hit, MarbleColor color, Vector2 velocity);
 
         private MarbleColor _color;
         private Rigidbody2D _rb;
         private MarbleChain _chain;
-        private HitCallback _onHit;
+        private HitResolver _resolver;
         private float _maxLifetime;
         private float _age;
         private bool _consumed;
@@ -27,12 +32,12 @@ namespace NovaSpark.Game.Shooter
             float radius,
             Sprite sprite,
             MarbleChain chain,
-            HitCallback onHit = null,
+            HitResolver resolver = null,
             float maxLifetime = 4f)
         {
             _color = color;
             _chain = chain;
-            _onHit = onHit;
+            _resolver = resolver;
             _maxLifetime = maxLifetime;
 
             _rb = GetComponent<Rigidbody2D>();
@@ -61,25 +66,27 @@ namespace NovaSpark.Game.Shooter
 
         private void OnCollisionEnter2D(Collision2D collision)
         {
-            // Guard: Unity can deliver more than one collision event before
-            // Destroy(gameObject) takes effect at end-of-frame (penetration into
-            // a second collider, multiple contact points on the same marble, or
-            // the inserted marble's collider overlapping ours on the next physics
-            // step). Without this flag, the projectile could insert twice — the
-            // 'ghost marble' bug Tony reported.
+            // _consumed guard — Unity can deliver two collision events before
+            // Destroy(gameObject) takes effect at end-of-frame.
             if (_consumed) return;
 
             var hit = collision.collider.GetComponentInParent<ChainMarble>();
             if (hit == null) return;
-            if (_chain == null) { _consumed = true; Destroy(gameObject); return; }
 
             _consumed = true;
             var velocity = _rb != null ? _rb.linearVelocity : Vector2.zero;
-            _chain.TryInsertAt(hit, velocity, _color);
-            _onHit?.Invoke(hit, _color, velocity);
 
-            // Disable collider immediately so any further physics step this frame
-            // can't fire another collision before Destroy lands.
+            if (_resolver != null)
+            {
+                _resolver.Invoke(hit, _color, velocity);
+            }
+            else if (_chain != null)
+            {
+                _chain.TryInsertAt(hit, velocity, _color);
+            }
+
+            // Disable collider + zero velocity so no further physics step this
+            // frame can re-fire collision before Destroy() lands.
             var col = GetComponent<CircleCollider2D>();
             if (col != null) col.enabled = false;
             if (_rb != null) _rb.linearVelocity = Vector2.zero;

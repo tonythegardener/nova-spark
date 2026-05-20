@@ -17,24 +17,23 @@ namespace NovaSpark.Game.Shooter
         private Camera _camera;
         private Sprite _sprite;
 
-        // Shot queue: index 0 is the chambered color (will be fired next),
-        // indices 1..N are previews. Length grows when powerups (LongScope)
-        // request extra visible queue slots.
+        // Shot queue: index 0 is chambered (fires next); 1..N are previews.
         private readonly List<MarbleColor> _shotQueue = new();
         private float _cooldownRemaining;
         private bool _firingEnabled;
 
-        // Equipped powerups, in equip order.
+        // Equipped powerups, in equip order. Order matters: first
+        // TryHandleProjectileHit that returns true wins.
         private readonly List<PowerupEffect> _equippedEffects = new();
 
         // Visuals
         private SpriteRenderer _baseRenderer;
-        private SpriteRenderer _currentRenderer;   // chambered marble on barrel tip
+        private SpriteRenderer _currentRenderer;
         private Transform _barrelPivot;
-        private Transform _previewRoot;            // parent for preview renderers (left of cannon)
+        private Transform _previewRoot;
         private readonly List<SpriteRenderer> _previewRenderers = new();
 
-        // Scratch buffers used by PickColor / OnChainChanged to avoid garbage.
+        // Scratch buffer used by PickColor / OnChainChanged to avoid garbage.
         private readonly List<MarbleColor> _scratchColors = new();
 
         public Transform BarrelMuzzle => _barrelPivot;
@@ -48,8 +47,6 @@ namespace NovaSpark.Game.Shooter
 
             BuildBaseVisuals();
 
-            // Default queue: 1 chambered + 1 preview = 2 entries. Powerups can
-            // extend the visible queue via ExtraVisibleQueue.
             _shotQueue.Clear();
             _shotQueue.Add(PickColor());
             _shotQueue.Add(PickColor());
@@ -63,10 +60,7 @@ namespace NovaSpark.Game.Shooter
         private void OnDestroy()
         {
             if (_chain != null) _chain.OnChainChanged -= OnChainChanged;
-            for (int i = _equippedEffects.Count - 1; i >= 0; i--)
-            {
-                _equippedEffects[i].Unequip();
-            }
+            for (int i = _equippedEffects.Count - 1; i >= 0; i--) _equippedEffects[i].Unequip();
             _equippedEffects.Clear();
         }
 
@@ -82,7 +76,7 @@ namespace NovaSpark.Game.Shooter
             effect.Equip(def, ctx);
             _equippedEffects.Add(effect);
             RecomputeQueueLength();
-            Debug.Log($"[NovaSpark.Cannon] Equipped powerup '{def.ContentId}' (effect '{def.EffectKind}')");
+            Debug.Log($"[NovaSpark.Cannon] Equipped powerup '{def.ContentId}' (effect '{def.EffectKind}', duration {def.DurationKind} {def.DurationParam}).");
         }
 
         public void UnequipAll()
@@ -92,6 +86,21 @@ namespace NovaSpark.Game.Shooter
             RecomputeQueueLength();
         }
 
+        private void PruneExpiredEffects()
+        {
+            bool anyRemoved = false;
+            for (int i = _equippedEffects.Count - 1; i >= 0; i--)
+            {
+                if (_equippedEffects[i].IsExpired)
+                {
+                    _equippedEffects[i].Unequip();
+                    _equippedEffects.RemoveAt(i);
+                    anyRemoved = true;
+                }
+            }
+            if (anyRemoved) RecomputeQueueLength();
+        }
+
         // -------------------- update / input --------------------
 
         private void Update()
@@ -99,10 +108,11 @@ namespace NovaSpark.Game.Shooter
             if (_level == null) return;
             _cooldownRemaining = Mathf.Max(0f, _cooldownRemaining - Time.deltaTime);
 
-            for (int i = 0; i < _equippedEffects.Count; i++) _equippedEffects[i].OnUpdate(Time.deltaTime);
+            // Effects tick + their Seconds-based expiry
+            for (int i = 0; i < _equippedEffects.Count; i++) _equippedEffects[i].TickLifetime(Time.deltaTime);
 
             var mouse = Mouse.current;
-            if (mouse == null) return;
+            if (mouse == null) { PruneExpiredEffects(); return; }
 
             Vector2 origin = _barrelPivot != null ? (Vector2)_barrelPivot.position : (Vector2)transform.position;
             Vector2 aimWorld = ReadMouseWorld(mouse);
@@ -114,12 +124,14 @@ namespace NovaSpark.Game.Shooter
 
             for (int i = 0; i < _equippedEffects.Count; i++) _equippedEffects[i].OnAim(origin, dir);
 
-            if (_firingEnabled && SwapShotPressed()) SwapShot();
+            if (_firingEnabled && SwapShotPressed()) RotateShotQueue();
 
             if (_firingEnabled && mouse.leftButton.wasPressedThisFrame && _cooldownRemaining <= 0f)
             {
                 Fire(dir);
             }
+
+            PruneExpiredEffects();
         }
 
         private static bool SwapShotPressed()
@@ -131,10 +143,17 @@ namespace NovaSpark.Game.Shooter
             return false;
         }
 
-        private void SwapShot()
+        // 1b.2a: swap is now a ROTATE through the visible queue. Chambered moves
+        // to the end of the visible portion; everything else shifts forward one.
+        // Player can cycle to any visible color into the chamber with N taps,
+        // preserving the rest of the order so planned sequences still hold.
+        private void RotateShotQueue()
         {
-            if (_shotQueue.Count < 2) return;
-            (_shotQueue[0], _shotQueue[1]) = (_shotQueue[1], _shotQueue[0]);
+            int visibleLen = 1 + _previewRenderers.Count; // chambered + previews
+            if (visibleLen < 2 || _shotQueue.Count < visibleLen) return;
+            var moved = _shotQueue[0];
+            _shotQueue.RemoveAt(0);
+            _shotQueue.Insert(visibleLen - 1, moved);
             RefreshChamberAndPreviewColors();
         }
 
@@ -168,24 +187,52 @@ namespace NovaSpark.Game.Shooter
             go.AddComponent<Rigidbody2D>();
             go.AddComponent<CircleCollider2D>();
             var p = go.AddComponent<Projectile>();
-            p.Launch(chamberedColor, velocity, _level.ProjectileRadius, _sprite, _chain, OnProjectileHit);
+            p.Launch(chamberedColor, velocity, _level.ProjectileRadius, _sprite, _chain, ResolveProjectileHit);
 
             for (int i = 0; i < _equippedEffects.Count; i++)
             {
                 _equippedEffects[i].OnProjectileLaunched(go, chamberedColor, velocity);
             }
 
+            // Per-shot duration decrement (PerShots / OneUse).
+            for (int i = 0; i < _equippedEffects.Count; i++) _equippedEffects[i].NotifyShotFired();
+
             _shotQueue.RemoveAt(0);
             _shotQueue.Add(PickColor());
             RefreshChamberAndPreviewColors();
         }
 
-        // Called by Projectile when it makes a valid chain hit (after insertion).
-        private void OnProjectileHit(ChainMarble hit, MarbleColor color, Vector2 velocity)
+        // Orchestrates a projectile hit: walks effects looking for one that
+        // fully handles it; if none does, applies the default insert with
+        // possibly-mutated color via ModifyInsertColor; finally fires
+        // OnProjectileHit notifications.
+        private void ResolveProjectileHit(ChainMarble hit, MarbleColor originalColor, Vector2 velocity)
         {
+            if (_chain == null) return;
+
+            bool handled = false;
             for (int i = 0; i < _equippedEffects.Count; i++)
             {
-                _equippedEffects[i].OnProjectileHit(hit, color, velocity);
+                if (_equippedEffects[i].TryHandleProjectileHit(hit, originalColor, velocity))
+                {
+                    handled = true;
+                    break;
+                }
+            }
+
+            if (!handled)
+            {
+                var color = originalColor;
+                for (int i = 0; i < _equippedEffects.Count; i++)
+                {
+                    color = _equippedEffects[i].ModifyInsertColor(hit, color);
+                }
+                _chain.TryInsertAt(hit, velocity, color);
+            }
+
+            for (int i = 0; i < _equippedEffects.Count; i++)
+            {
+                _equippedEffects[i].OnProjectileHit(hit, originalColor, velocity);
             }
         }
 
@@ -199,7 +246,7 @@ namespace NovaSpark.Game.Shooter
                 if (_equippedEffects[i].ExtraVisibleQueue > extra)
                     extra = _equippedEffects[i].ExtraVisibleQueue;
             }
-            int targetPreviews = 1 + extra;   // default 1 preview + extras
+            int targetPreviews = 1 + extra;
             int targetTotal = 1 + targetPreviews;
 
             while (_shotQueue.Count < targetTotal) _shotQueue.Add(PickColor());
@@ -211,7 +258,6 @@ namespace NovaSpark.Game.Shooter
 
         private void RebuildPreviewRow(int previewCount)
         {
-            // Tear down existing renderers
             for (int i = _previewRenderers.Count - 1; i >= 0; i--)
             {
                 if (_previewRenderers[i] != null) Destroy(_previewRenderers[i].gameObject);
@@ -226,8 +272,6 @@ namespace NovaSpark.Game.Shooter
                 _previewRoot.localPosition = new Vector3(-1.1f, -0.1f, 0f);
             }
 
-            // Row to the left of the cannon, each preview offset further left.
-            // Smaller preview as it goes further from the chambered slot.
             for (int i = 0; i < previewCount; i++)
             {
                 var go = new GameObject($"Preview_{i}");
@@ -287,8 +331,6 @@ namespace NovaSpark.Game.Shooter
 
         private MarbleColor AdjacentAvoid(int idx)
         {
-            // Try to avoid an immediate duplicate with the previous entry so
-            // adjacent slots tend to be different colors.
             if (idx > 0 && idx - 1 < _shotQueue.Count) return _shotQueue[idx - 1];
             if (idx + 1 < _shotQueue.Count) return _shotQueue[idx + 1];
             return _shotQueue[idx];
@@ -323,7 +365,7 @@ namespace NovaSpark.Game.Shooter
             return _level.AllowedColors[Random.Range(0, _level.AllowedColors.Length)];
         }
 
-        // -------------------- build base visuals (cannon body + barrel + chambered) --------------------
+        // -------------------- build base visuals --------------------
 
         private void BuildBaseVisuals()
         {

@@ -3,6 +3,15 @@ using UnityEngine;
 
 namespace NovaSpark.Powerups
 {
+    public enum PowerupDurationKind
+    {
+        Permanent = 0,   // never expires (use sparingly; meta-progression items)
+        PerLevel = 1,    // lasts N levels then unequips at level end
+        PerShots = 2,    // lasts N projectile firings
+        OneUse = 3,      // unequips after first activation (active powerups)
+        Seconds = 4,     // expires after N seconds of in-level time
+    }
+
     [CreateAssetMenu(
         fileName = "NewPowerup",
         menuName = "Nova Spark/Content/Powerup Definition",
@@ -20,14 +29,18 @@ namespace NovaSpark.Powerups
 
         [Header("Effect")]
         [Tooltip("String key resolved by NovaSpark.Game.Powerups.PowerupEffects.Create. " +
-                 "Examples: laser_sight, rapid_reload, long_scope.")]
+                 "Examples: laser_sight, rapid_reload, long_scope, mimic_shot, explosive_round, vaporizer, knockout.")]
         [SerializeField] private string effectKind = "";
-        [Tooltip("Primary numeric parameter for the effect. Interpretation depends on effectKind " +
-                 "(e.g., line length in units for laser_sight, cooldown multiplier for rapid_reload, " +
-                 "extra preview slots for long_scope).")]
+        [Tooltip("Primary numeric parameter for the effect. Interpretation depends on effectKind.")]
         [SerializeField] private float magnitude = 1f;
         [Tooltip("Secondary numeric parameter. Effects that need only one param ignore this.")]
         [SerializeField] private float secondaryMagnitude = 0f;
+
+        [Header("Duration")]
+        [SerializeField] private PowerupDurationKind durationKind = PowerupDurationKind.Permanent;
+        [Tooltip("Meaning depends on durationKind: PerLevel = N levels, PerShots = N firings, " +
+                 "Seconds = N seconds (uses ceiling), OneUse/Permanent = ignored.")]
+        [SerializeField] private float durationParam = 1f;
 
         public string ContentId => contentId;
         public int SchemaVersion => schemaVersion;
@@ -37,5 +50,7 @@ namespace NovaSpark.Powerups
         public string EffectKind => effectKind;
         public float Magnitude => magnitude;
         public float SecondaryMagnitude => secondaryMagnitude;
+        public PowerupDurationKind DurationKind => durationKind;
+        public float DurationParam => durationParam;
     }
 }

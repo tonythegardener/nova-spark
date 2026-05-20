@@ -13,9 +13,13 @@ namespace NovaSpark.Game.Powerups
         {
             switch (effectKind)
             {
-                case "laser_sight":   return new LaserSightEffect();
-                case "rapid_reload":  return new RapidReloadEffect();
-                case "long_scope":    return new LongScopeEffect();
+                case "laser_sight":     return new LaserSightEffect();
+                case "rapid_reload":    return new RapidReloadEffect();
+                case "long_scope":      return new LongScopeEffect();
+                case "mimic_shot":      return new MimicShotEffect();
+                case "explosive_round": return new ExplosiveRoundEffect();
+                case "vaporizer":       return new VaporizerEffect();
+                case "knockout":        return new KnockoutRoundEffect();
                 default:
                     Debug.LogWarning($"[NovaSpark.Powerups] Unknown effectKind '{effectKind}' — no effect created.");
                     return null;

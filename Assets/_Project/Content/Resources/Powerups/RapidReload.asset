@@ -20,3 +20,5 @@ MonoBehaviour:
   effectKind: rapid_reload
   magnitude: 0.5
   secondaryMagnitude: 0
+  durationKind: 4
+  durationParam: 20

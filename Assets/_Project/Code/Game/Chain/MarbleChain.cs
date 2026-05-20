@@ -303,6 +303,103 @@ namespace NovaSpark.Game.Chain
             }
         }
 
+        // -------------------- public destroy / dislodge API --------------------
+
+        // Destroy a single marble in the chain. Used by powerup effects like
+        // Vaporizer. Registers a pending seam if both flanks survive.
+        public bool DestroyMarble(ChainMarble marble)
+        {
+            int idx = _marbles.IndexOf(marble);
+            if (idx < 0) return false;
+            DestroyRange(idx, idx);
+            return true;
+        }
+
+        // Destroy every marble within `radius` arc-length sphere of `center` in
+        // world space. Used by Explosive Round. Each contiguous index range
+        // becomes its own pending seam so cascades can chain through them.
+        public int DestroyInRadius(Vector2 center, float radius)
+        {
+            if (_marbles.Count == 0) return 0;
+            float r2 = radius * radius;
+
+            // Collect indices that fall within the explosion radius. Already
+            // sorted ascending because we walk in order.
+            var toRemove = new System.Collections.Generic.List<int>();
+            for (int i = 0; i < _marbles.Count; i++)
+            {
+                if (((Vector2)_marbles[i].transform.position - center).sqrMagnitude <= r2)
+                {
+                    toRemove.Add(i);
+                }
+            }
+            if (toRemove.Count == 0) return 0;
+
+            // Walk contiguous index ranges, registering a seam per range before
+            // we mutate the list. Each range's head-side survivor is the marble
+            // immediately before rangeStart.
+            int rangeStart = toRemove[0];
+            int rangeEnd = rangeStart;
+            for (int i = 1; i < toRemove.Count; i++)
+            {
+                if (toRemove[i] == rangeEnd + 1)
+                {
+                    rangeEnd = toRemove[i];
+                }
+                else
+                {
+                    MaybeRegisterSeam(rangeStart, rangeEnd);
+                    rangeStart = toRemove[i];
+                    rangeEnd = rangeStart;
+                }
+            }
+            MaybeRegisterSeam(rangeStart, rangeEnd);
+
+            // Now actually destroy, walking in reverse so earlier indices stay valid.
+            for (int i = toRemove.Count - 1; i >= 0; i--)
+            {
+                var m = _marbles[toRemove[i]];
+                OnMarbleDestroyed?.Invoke(m.transform.position, m.Color);
+                Destroy(m.gameObject);
+                _marbles.RemoveAt(toRemove[i]);
+            }
+
+            OnMatchResolved?.Invoke();
+            OnChainChanged?.Invoke();
+            return toRemove.Count;
+        }
+
+        private void MaybeRegisterSeam(int rangeStart, int rangeEnd)
+        {
+            ChainMarble headSide = rangeStart > 0 ? _marbles[rangeStart - 1] : null;
+            bool tailExists = rangeEnd < _marbles.Count - 1;
+            if (headSide != null && tailExists) _pendingSeams.Add(headSide);
+        }
+
+        // Remove `marble` from the chain WITHOUT firing OnMarbleDestroyed
+        // (so visuals/scoring don't double-count) but still registering the seam
+        // and the chain-changed event. Used by Knockout Round, which immediately
+        // spawns a flying marble carrying the dislodged color.
+        public bool DislodgeMarble(ChainMarble marble)
+        {
+            int idx = _marbles.IndexOf(marble);
+            if (idx < 0) return false;
+
+            ChainMarble headSide = idx > 0 ? _marbles[idx - 1] : null;
+            bool tailExists = idx < _marbles.Count - 1;
+
+            // Don't fire OnMarbleDestroyed — the marble isn't really "destroyed",
+            // it's being launched. Knockout will eventually settle it elsewhere
+            // (which causes a normal insert) or off-screen (eliminated silently).
+            Destroy(marble.gameObject);
+            _marbles.RemoveAt(idx);
+
+            if (headSide != null && tailExists) _pendingSeams.Add(headSide);
+
+            OnChainChanged?.Invoke();
+            return true;
+        }
+
         // -------------------- end conditions --------------------
 
         private void CheckEndConditions()

@@ -19,6 +19,10 @@ namespace NovaSpark.Editor
         private const string LaserSightAssetPath = "Assets/_Project/Content/Resources/Powerups/LaserSight.asset";
         private const string RapidReloadAssetPath = "Assets/_Project/Content/Resources/Powerups/RapidReload.asset";
         private const string LongScopeAssetPath = "Assets/_Project/Content/Resources/Powerups/LongScope.asset";
+        private const string MimicShotAssetPath = "Assets/_Project/Content/Resources/Powerups/MimicShot.asset";
+        private const string ExplosiveRoundAssetPath = "Assets/_Project/Content/Resources/Powerups/ExplosiveRound.asset";
+        private const string VaporizerAssetPath = "Assets/_Project/Content/Resources/Powerups/Vaporizer.asset";
+        private const string KnockoutAssetPath = "Assets/_Project/Content/Resources/Powerups/KnockoutRound.asset";
         private const string Phase0bLevelAssetPath = "Assets/_Project/Content/Resources/Levels/Phase0bSmokeTest.asset";
         private const string SwitchbackLevelAssetPath = "Assets/_Project/Content/Resources/Levels/Switchback.asset";
         private const string LongSweepLevelAssetPath = "Assets/_Project/Content/Resources/Levels/LongSweep.asset";
@@ -29,6 +33,10 @@ namespace NovaSpark.Editor
             EnsureLaserSightAsset();
             EnsureRapidReloadAsset();
             EnsureLongScopeAsset();
+            EnsureMimicShotAsset();
+            EnsureExplosiveRoundAsset();
+            EnsureVaporizerAsset();
+            EnsureKnockoutAsset();
             EnsurePhase0bLevelAsset();
             EnsureSwitchbackLevelAsset();
             EnsureLongSweepLevelAsset();
@@ -93,6 +101,8 @@ namespace NovaSpark.Editor
                 SetPrivate(so, "description", "Projects a trajectory line from your cannon along the aim direction.");
                 SetPrivate(so, "effectKind", "laser_sight");
                 SetPrivate(so, "magnitude", 18f);   // line length in world units
+                SetPrivate(so, "durationKind", PowerupDurationKind.Seconds);
+                SetPrivate(so, "durationParam", 30f);
                 SetPrivate(so, "schemaVersion", 1);
             });
         }
@@ -105,7 +115,9 @@ namespace NovaSpark.Editor
                 SetPrivate(so, "displayName", "Rapid Reload");
                 SetPrivate(so, "description", "Halves the cannon's cooldown between shots.");
                 SetPrivate(so, "effectKind", "rapid_reload");
-                SetPrivate(so, "magnitude", 0.5f);  // cooldown multiplier (0.5 = 2x fire rate)
+                SetPrivate(so, "magnitude", 0.5f);
+                SetPrivate(so, "durationKind", PowerupDurationKind.Seconds);
+                SetPrivate(so, "durationParam", 20f);
                 SetPrivate(so, "schemaVersion", 1);
             });
         }
@@ -118,7 +130,69 @@ namespace NovaSpark.Editor
                 SetPrivate(so, "displayName", "Long Scope");
                 SetPrivate(so, "description", "Reveals additional upcoming shots in the queue.");
                 SetPrivate(so, "effectKind", "long_scope");
-                SetPrivate(so, "magnitude", 3f);    // extra preview slots (3 => total 4 previews)
+                SetPrivate(so, "magnitude", 3f);
+                SetPrivate(so, "durationKind", PowerupDurationKind.PerLevel);
+                SetPrivate(so, "durationParam", 1f);
+                SetPrivate(so, "schemaVersion", 1);
+            });
+        }
+
+        private static void EnsureMimicShotAsset()
+        {
+            EnsurePowerupAsset(MimicShotAssetPath, so =>
+            {
+                SetPrivate(so, "contentId", "powerup.mimic_shot");
+                SetPrivate(so, "displayName", "Mimic Shot");
+                SetPrivate(so, "description", "Your next shots take on the color of the marble they strike before settling.");
+                SetPrivate(so, "effectKind", "mimic_shot");
+                SetPrivate(so, "magnitude", 1f);
+                SetPrivate(so, "durationKind", PowerupDurationKind.PerShots);
+                SetPrivate(so, "durationParam", 5f);
+                SetPrivate(so, "schemaVersion", 1);
+            });
+        }
+
+        private static void EnsureExplosiveRoundAsset()
+        {
+            EnsurePowerupAsset(ExplosiveRoundAssetPath, so =>
+            {
+                SetPrivate(so, "contentId", "powerup.explosive_round");
+                SetPrivate(so, "displayName", "Explosive Round");
+                SetPrivate(so, "description", "Detonates on impact, destroying nearby marbles regardless of color.");
+                SetPrivate(so, "effectKind", "explosive_round");
+                SetPrivate(so, "magnitude", 1.2f);  // explosion radius in world units
+                SetPrivate(so, "durationKind", PowerupDurationKind.PerShots);
+                SetPrivate(so, "durationParam", 3f);
+                SetPrivate(so, "schemaVersion", 1);
+            });
+        }
+
+        private static void EnsureVaporizerAsset()
+        {
+            EnsurePowerupAsset(VaporizerAssetPath, so =>
+            {
+                SetPrivate(so, "contentId", "powerup.vaporizer");
+                SetPrivate(so, "displayName", "Vaporizer");
+                SetPrivate(so, "description", "Disintegrates the single marble it strikes — no insertion, no radius.");
+                SetPrivate(so, "effectKind", "vaporizer");
+                SetPrivate(so, "magnitude", 1f);
+                SetPrivate(so, "durationKind", PowerupDurationKind.PerShots);
+                SetPrivate(so, "durationParam", 5f);
+                SetPrivate(so, "schemaVersion", 1);
+            });
+        }
+
+        private static void EnsureKnockoutAsset()
+        {
+            EnsurePowerupAsset(KnockoutAssetPath, so =>
+            {
+                SetPrivate(so, "contentId", "powerup.knockout");
+                SetPrivate(so, "displayName", "Knockout Round");
+                SetPrivate(so, "description", "Dislodges the marble it hits and sends it flying onward — it settles where it next touches, or off-screen.");
+                SetPrivate(so, "effectKind", "knockout");
+                SetPrivate(so, "magnitude", 1f);
+                SetPrivate(so, "durationKind", PowerupDurationKind.PerShots);
+                SetPrivate(so, "durationParam", 3f);
                 SetPrivate(so, "schemaVersion", 1);
             });
         }

@@ -20,3 +20,5 @@ MonoBehaviour:
   effectKind: laser_sight
   magnitude: 18
   secondaryMagnitude: 0
+  durationKind: 4
+  durationParam: 30

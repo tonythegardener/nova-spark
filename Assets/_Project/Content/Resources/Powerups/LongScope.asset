@@ -20,3 +20,5 @@ MonoBehaviour:
   effectKind: long_scope
   magnitude: 3
   secondaryMagnitude: 0
+  durationKind: 1
+  durationParam: 1
