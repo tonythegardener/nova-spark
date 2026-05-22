@@ -343,16 +343,32 @@ namespace NovaSpark.Game.Shooter
 
         private void RefreshChamberAndPreviewColors()
         {
+            // Equipped effects can override the chambered + preview visuals so
+            // the player sees that a non-color-matching effect is loaded
+            // (Vaporizer cross, Mimic ring). First non-null override wins.
+            Sprite overrideSprite = null;
+            Color? overrideColor = null;
+            for (int i = 0; i < _equippedEffects.Count; i++)
+            {
+                if (overrideSprite == null && _equippedEffects[i].ChamberOverrideSprite != null)
+                    overrideSprite = _equippedEffects[i].ChamberOverrideSprite;
+                if (!overrideColor.HasValue && _equippedEffects[i].ChamberOverrideColor.HasValue)
+                    overrideColor = _equippedEffects[i].ChamberOverrideColor;
+                if (overrideSprite != null && overrideColor.HasValue) break;
+            }
+
             if (_currentRenderer != null && _shotQueue.Count > 0)
             {
-                _currentRenderer.color = _shotQueue[0].ToRGB();
+                _currentRenderer.sprite = overrideSprite != null ? overrideSprite : _sprite;
+                _currentRenderer.color = overrideColor ?? _shotQueue[0].ToRGB();
             }
             for (int i = 0; i < _previewRenderers.Count; i++)
             {
                 int qIdx = i + 1;
                 if (qIdx < _shotQueue.Count)
                 {
-                    _previewRenderers[i].color = _shotQueue[qIdx].ToRGB();
+                    _previewRenderers[i].sprite = overrideSprite != null ? overrideSprite : _sprite;
+                    _previewRenderers[i].color = overrideColor ?? _shotQueue[qIdx].ToRGB();
                     _previewRenderers[i].enabled = true;
                 }
                 else

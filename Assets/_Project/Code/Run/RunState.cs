@@ -94,12 +94,37 @@ namespace NovaSpark.Run
             return available.GetRange(0, take);
         }
 
-        // Returns a random powerup from runPool, or null if pool is empty. Used
-        // by DropSpawner to decide what each drop is.
+        // Returns a random powerup from runPool, or null if pool is empty.
         public static PowerupDefinition PickRandomFromRunPool()
         {
             if (_runPool.Count == 0) return null;
             return _runPool[Random.Range(0, _runPool.Count)];
+        }
+
+        // Drops can only spawn Shooter-kind powerups — Path-kind effects don't
+        // equip on the cannon (they apply to the chain). Used by DropSpawner.
+        public static PowerupDefinition PickRandomShooterFromRunPool() => PickRandomOfKind(PowerupKind.Shooter);
+        public static PowerupDefinition PickRandomPathFromRunPool() => PickRandomOfKind(PowerupKind.Path);
+
+        private static PowerupDefinition PickRandomOfKind(PowerupKind kind)
+        {
+            int count = 0;
+            for (int i = 0; i < _runPool.Count; i++)
+            {
+                if (_runPool[i] != null && _runPool[i].Kind == kind) count++;
+            }
+            if (count == 0) return null;
+            int target = Random.Range(0, count);
+            int seen = 0;
+            for (int i = 0; i < _runPool.Count; i++)
+            {
+                if (_runPool[i] != null && _runPool[i].Kind == kind)
+                {
+                    if (seen == target) return _runPool[i];
+                    seen++;
+                }
+            }
+            return null;
         }
     }
 }

@@ -7,6 +7,8 @@ namespace NovaSpark.Core
         private static Sprite _circleSprite;
         private static Sprite _diamondSprite;
         private static Sprite _snowflakeSprite;
+        private static Sprite _crossSprite;
+        private static Sprite _ringSprite;
 
         public static Sprite GetWhiteCircle()
         {
@@ -23,6 +25,111 @@ namespace NovaSpark.Core
             if (_snowflakeSprite != null) return _snowflakeSprite;
             _snowflakeSprite = CreateSnowflakeSprite(64);
             return _snowflakeSprite;
+        }
+
+        // Bold plus/cross — used as the Vaporizer chambered marker.
+        public static Sprite GetWhiteCross()
+        {
+            if (_crossSprite != null) return _crossSprite;
+            _crossSprite = CreateCrossSprite(64);
+            return _crossSprite;
+        }
+
+        public static Sprite CreateCrossSprite(int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            float center = size * 0.5f;
+            float armHalfLen = size * 0.40f;
+            float armHalfThick = size * 0.11f;
+            float edge = 1.0f;
+
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float px = Mathf.Abs(x - center + 0.5f);
+                    float py = Mathf.Abs(y - center + 0.5f);
+
+                    bool inHoriz = px <= armHalfLen && py <= armHalfThick;
+                    bool inVert  = py <= armHalfLen && px <= armHalfThick;
+                    byte a = 0;
+                    if (inHoriz || inVert)
+                    {
+                        // Distance to the nearest cross edge (for AA)
+                        float dHoriz = Mathf.Min(armHalfLen - px, armHalfThick - py);
+                        float dVert  = Mathf.Min(armHalfLen - py, armHalfThick - px);
+                        float d = Mathf.Max(dHoriz, dVert);
+                        if (d >= edge) a = 255;
+                        else a = (byte)(Mathf.Clamp01(d / edge) * 255f);
+                    }
+                    pixels[y * size + x] = new Color32(255, 255, 255, a);
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(false, true);
+
+            var sprite = Sprite.Create(tex, new Rect(0, 0, size, size),
+                new Vector2(0.5f, 0.5f), size);
+            sprite.hideFlags = HideFlags.HideAndDontSave;
+            return sprite;
+        }
+
+        // Hollow circle outline — used as the Mimic Shot chambered marker
+        // ('a loaded shot whose color is determined on impact').
+        public static Sprite GetWhiteRing()
+        {
+            if (_ringSprite != null) return _ringSprite;
+            _ringSprite = CreateRingSprite(64, innerRatio: 0.55f);
+            return _ringSprite;
+        }
+
+        public static Sprite CreateRingSprite(int diameter, float innerRatio)
+        {
+            var tex = new Texture2D(diameter, diameter, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            float r = diameter * 0.5f;
+            float outerR = r;
+            float innerR = r * innerRatio;
+            float edge = 1.5f;
+
+            var pixels = new Color32[diameter * diameter];
+            for (int y = 0; y < diameter; y++)
+            {
+                for (int x = 0; x < diameter; x++)
+                {
+                    float dx = x - r + 0.5f;
+                    float dy = y - r + 0.5f;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy);
+
+                    byte a;
+                    if (d > outerR || d < innerR - edge) a = 0;
+                    else if (d <= outerR - edge && d >= innerR) a = 255;
+                    else
+                    {
+                        float aOuter = Mathf.Clamp01((outerR - d) / edge);
+                        float aInner = Mathf.Clamp01((d - innerR + edge) / edge);
+                        a = (byte)(Mathf.Min(aOuter, aInner) * 255f);
+                    }
+                    pixels[y * diameter + x] = new Color32(255, 255, 255, a);
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(false, true);
+
+            var sprite = Sprite.Create(tex, new Rect(0, 0, diameter, diameter),
+                new Vector2(0.5f, 0.5f), diameter);
+            sprite.hideFlags = HideFlags.HideAndDontSave;
+            return sprite;
         }
 
         public static Sprite CreateSnowflakeSprite(int size)

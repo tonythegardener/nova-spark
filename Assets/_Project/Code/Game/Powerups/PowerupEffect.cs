@@ -137,5 +137,21 @@ namespace NovaSpark.Game.Powerups
         /// otherwise change the chambered marble (e.g., Vaporizer).
         /// </summary>
         public virtual Color? BarrelTint => null;
+
+        /// <summary>
+        /// If non-null, the Cannon swaps the chambered marble (and visible
+        /// previews) to this sprite while the effect is equipped. Use to
+        /// signal that the loaded shot is NOT an ordinary colored marble —
+        /// e.g., Vaporizer (destroys on hit) and Mimic Shot (color doesn't
+        /// matter). First non-null effect in equip order wins.
+        /// </summary>
+        public virtual Sprite ChamberOverrideSprite => null;
+
+        /// <summary>
+        /// Companion to ChamberOverrideSprite: tints the chambered + previews
+        /// while the effect is equipped. Falls back to the chambered marble's
+        /// real color if both this and ChamberOverrideSprite are null.
+        /// </summary>
+        public virtual Color? ChamberOverrideColor => null;
     }
 }

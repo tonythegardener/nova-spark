@@ -90,7 +90,12 @@ namespace NovaSpark.Game.Powerups
 
         private void TrySpawnOne()
         {
-            var def = RunState.PickRandomFromRunPool();
+            // Off-path drops only carry Shooter-kind powerups (Path effects come
+            // in as special chain marbles, not drops). Without this filter, a
+            // Chrono Field drop would 'collect' but Cannon.EquipPowerup would
+            // bail silently because PowerupEffects.Create has no chrono_field
+            // case — the player would shoot a drop and see no effect at all.
+            var def = RunState.PickRandomShooterFromRunPool();
             if (def == null) return;
 
             if (!TryPickPosition(out var pos)) return;
