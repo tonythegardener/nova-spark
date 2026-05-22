@@ -41,6 +41,7 @@ namespace NovaSpark.Game.Level
         private GUIStyle _titleStyle;
         private GUIStyle _bodyStyle;
         private GUIStyle _buttonStyle;
+        private GUIStyle _hudStyle;
         private bool _stylesReady;
 
         private void Start()
@@ -329,6 +330,15 @@ namespace NovaSpark.Game.Level
         private void OnGUI()
         {
             EnsureStyles();
+
+            // The powerup HUD is visible during active play (and while paused).
+            // Hidden when no level is loaded (LevelSelect) and when end screens
+            // are blocking interaction.
+            if (_state == AppState.Playing || _state == AppState.Paused)
+            {
+                DrawPowerupHud();
+            }
+
             switch (_state)
             {
                 case AppState.LevelSelect: DrawLevelSelect(); break;
@@ -336,6 +346,63 @@ namespace NovaSpark.Game.Level
                 case AppState.Draft:       DrawDraftOverlay(); break;
                 case AppState.Won:         DrawEndScreen(true);  break;
                 case AppState.Lost:        DrawEndScreen(false); break;
+            }
+        }
+
+        // Text-only HUD at the top-left showing equipped powerups + countdowns.
+        // Temporary until we do a proper icon pass (Tony 2026-05-21).
+        private void DrawPowerupHud()
+        {
+            int x = 14;
+            int y = 14;
+            const int rowH = 22;
+            const int width = 360;
+
+            int rowsShown = 0;
+
+            if (_shooter != null)
+            {
+                var equipped = _shooter.EquippedEffects;
+                for (int i = 0; i < equipped.Count; i++)
+                {
+                    var fx = equipped[i];
+                    if (fx?.Definition == null) continue;
+                    string remaining = FormatEffectRemaining(fx);
+                    string label = $"<b>{fx.Definition.DisplayName}</b>  <color=#a8c0ff>{remaining}</color>";
+                    GUI.Label(new Rect(x, y + rowsShown * rowH, width, rowH), label, _hudStyle);
+                    rowsShown++;
+                }
+            }
+
+            if (_chain != null)
+            {
+                foreach (var kv in _chain.ActivePathEffects)
+                {
+                    var pe = kv.Value;
+                    if (pe.Definition == null) continue;
+                    string label = $"<b>{pe.Definition.DisplayName}</b>  <color=#ffd28a>{pe.SecondsRemaining:F1}s</color>";
+                    GUI.Label(new Rect(x, y + rowsShown * rowH, width, rowH), label, _hudStyle);
+                    rowsShown++;
+                }
+            }
+
+            if (rowsShown == 0)
+            {
+                GUI.Label(new Rect(x, y, width, rowH), "<color=#5e6675>no powerups equipped</color>", _hudStyle);
+            }
+        }
+
+        private static string FormatEffectRemaining(Powerups.PowerupEffect fx)
+        {
+            var dk = fx.Definition.DurationKind;
+            switch (dk)
+            {
+                case PowerupDurationKind.Seconds: return $"{fx.SecondsRemaining:F1}s";
+                case PowerupDurationKind.PerShots: return $"{fx.ShotsRemaining} shots";
+                case PowerupDurationKind.OneUse: return fx.ShotsRemaining > 0 ? "ready" : "spent";
+                case PowerupDurationKind.PerLevel: return "this level";
+                case PowerupDurationKind.Permanent: return "permanent";
+                default: return "";
             }
         }
 
@@ -499,6 +566,13 @@ namespace NovaSpark.Game.Level
                 richText = true,
                 wordWrap = true,
             };
+            _hudStyle = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleLeft,
+                fontSize = 13,
+                richText = true,
+            };
+            _hudStyle.normal.textColor = new Color(0.88f, 0.90f, 0.95f);
             _stylesReady = true;
         }
 

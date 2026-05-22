@@ -63,6 +63,11 @@ namespace NovaSpark.Game.Level
         [Tooltip("Seconds each drop lingers before expiring uncollected. <= 0 uses spawner default.")]
         [SerializeField] private float dropLifetimeSeconds = 15f;
 
+        [Header("Path-Type Marbles (special chain spawns)")]
+        [Tooltip("Per-spawn chance (0..1) that a chain marble is a path-effect supply package drawn from the run pool's Path-kind subset.")]
+        [Range(0f, 0.5f)]
+        [SerializeField] private float pathMarbleSpawnChance = 0.05f;
+
         public string ContentId => contentId;
         public int SchemaVersion => schemaVersion;
         public string DisplayName => displayName;
@@ -89,6 +94,8 @@ namespace NovaSpark.Game.Level
         public float DropSpawnIntervalSeconds => dropSpawnIntervalSeconds;
         public int DropMaxConcurrent => dropMaxConcurrent;
         public float DropLifetimeSeconds => dropLifetimeSeconds;
+
+        public float PathMarbleSpawnChance => pathMarbleSpawnChance;
 
         public MarbleColor[] AllowedColors => MarbleColors.All;
     }

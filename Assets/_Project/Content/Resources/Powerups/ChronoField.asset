@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d3f06b9da5952344aa78306e97341ff, type: 3}
+  m_Name: ChronoField
+  m_EditorClassIdentifier: NovaSpark.Powerups::NovaSpark.Powerups.PowerupDefinition
+  contentId: powerup.chrono_field
+  schemaVersion: 1
+  displayName: Chrono Field
+  description: Hit the supply marble to slow the enemy chain for a short time. Same
+    effect re-applied extends duration.
+  icon: {fileID: 0}
+  effectKind: chrono_field
+  kind: 1
+  magnitude: 0.3
+  secondaryMagnitude: 0
+  durationKind: 4
+  durationParam: 5

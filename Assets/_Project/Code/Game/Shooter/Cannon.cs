@@ -38,6 +38,9 @@ namespace NovaSpark.Game.Shooter
 
         public Transform BarrelMuzzle => _barrelPivot;
 
+        // Exposed so the LevelController HUD can list active effects + timers.
+        public IReadOnlyList<PowerupEffect> EquippedEffects => _equippedEffects;
+
         public void Configure(LevelDefinition level, MarbleChain chain, Camera cam, Sprite sprite)
         {
             _level = level;
@@ -226,6 +229,17 @@ namespace NovaSpark.Game.Shooter
         private void ResolveProjectileHit(ChainMarble hit, MarbleColor originalColor, Vector2 velocity)
         {
             if (_chain == null) return;
+
+            // Path-marble bypass — direct hit on a special chain marble activates
+            // its Path-kind powerup and destroys the marble. Cannon Shooter
+            // effects (Mimic, Explosive, etc.) do NOT run for path-marble hits.
+            if (hit != null && hit.IsSpecial
+                && hit.SpecialPowerup != null
+                && hit.SpecialPowerup.Kind == PowerupKind.Path)
+            {
+                _chain.OnPathMarbleHit(hit);
+                return;
+            }
 
             bool handled = false;
             for (int i = 0; i < _equippedEffects.Count; i++)

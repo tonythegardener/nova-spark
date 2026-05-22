@@ -23,6 +23,7 @@ namespace NovaSpark.Editor
         private const string ExplosiveRoundAssetPath = "Assets/_Project/Content/Resources/Powerups/ExplosiveRound.asset";
         private const string VaporizerAssetPath = "Assets/_Project/Content/Resources/Powerups/Vaporizer.asset";
         private const string KnockoutAssetPath = "Assets/_Project/Content/Resources/Powerups/KnockoutRound.asset";
+        private const string ChronoFieldAssetPath = "Assets/_Project/Content/Resources/Powerups/ChronoField.asset";
         private const string Phase0bLevelAssetPath = "Assets/_Project/Content/Resources/Levels/Phase0bSmokeTest.asset";
         private const string SwitchbackLevelAssetPath = "Assets/_Project/Content/Resources/Levels/Switchback.asset";
         private const string LongSweepLevelAssetPath = "Assets/_Project/Content/Resources/Levels/LongSweep.asset";
@@ -37,6 +38,7 @@ namespace NovaSpark.Editor
             EnsureExplosiveRoundAsset();
             EnsureVaporizerAsset();
             EnsureKnockoutAsset();
+            EnsureChronoFieldAsset();
             EnsurePhase0bLevelAsset();
             EnsureSwitchbackLevelAsset();
             EnsureLongSweepLevelAsset();
@@ -200,6 +202,22 @@ namespace NovaSpark.Editor
                 SetPrivate(so, "durationKind", PowerupDurationKind.PerShots);
                 SetPrivate(so, "durationParam", 3f);
                 SetPrivate(so, "kind", PowerupKind.Shooter);
+                SetPrivate(so, "schemaVersion", 1);
+            });
+        }
+
+        private static void EnsureChronoFieldAsset()
+        {
+            EnsurePowerupAsset(ChronoFieldAssetPath, so =>
+            {
+                SetPrivate(so, "contentId", "powerup.chrono_field");
+                SetPrivate(so, "displayName", "Chrono Field");
+                SetPrivate(so, "description", "Hit the supply marble to slow the enemy chain for a short time. Same effect re-applied extends duration.");
+                SetPrivate(so, "effectKind", "chrono_field");
+                SetPrivate(so, "magnitude", 0.3f);       // chain speed multiplier
+                SetPrivate(so, "durationKind", PowerupDurationKind.Seconds);
+                SetPrivate(so, "durationParam", 5f);
+                SetPrivate(so, "kind", PowerupKind.Path);
                 SetPrivate(so, "schemaVersion", 1);
             });
         }

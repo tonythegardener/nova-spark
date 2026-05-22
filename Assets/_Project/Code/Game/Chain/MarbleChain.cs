@@ -1,6 +1,9 @@
 using System.Collections.Generic;
 using NovaSpark.Core;
 using NovaSpark.Game.Level;
+using NovaSpark.Game.Powerups;
+using NovaSpark.Powerups;
+using NovaSpark.Run;
 using UnityEngine;
 
 namespace NovaSpark.Game.Chain
@@ -40,6 +43,24 @@ namespace NovaSpark.Game.Chain
         // Pre-allocated set reused by ActiveColors to avoid per-frame garbage.
         private readonly HashSet<MarbleColor> _activeColorsScratch = new();
 
+        // Active path-effects currently applied to the chain. Key = effectKind
+        // so same-key applies extend duration (Tony 2026-05-21 rule). Effective
+        // speed multiplier is the product of all active multipliers.
+        public struct ActivePathEffect
+        {
+            public PowerupDefinition Definition;
+            public float Multiplier;
+            public float SecondsRemaining;
+        }
+
+        private readonly Dictionary<string, ActivePathEffect> _activePathEffects = new();
+        private float _effectiveSpeedMultiplier = 1f;
+        private readonly List<string> _pathEffectKeyScratch = new();
+        private readonly List<PowerupDefinition> _pathPoolScratch = new();
+
+        public IReadOnlyDictionary<string, ActivePathEffect> ActivePathEffects => _activePathEffects;
+        public float EffectiveSpeedMultiplier => _effectiveSpeedMultiplier;
+
         public IReadOnlyCollection<MarbleColor> ActiveColors()
         {
             _activeColorsScratch.Clear();
@@ -55,15 +76,93 @@ namespace NovaSpark.Game.Chain
             _level = level;
             _path = path;
             _sprite = sprite;
+            _activePathEffects.Clear();
+            _effectiveSpeedMultiplier = 1f;
         }
 
         public void Tick(float dt)
         {
+            TickPathEffects(dt);
             HandleSpawning(dt);
             AdvanceChain(dt);
             UpdatePositions();
             ProcessPendingSeams();
             CheckEndConditions();
+        }
+
+        // -------------------- path effects --------------------
+
+        // Apply (or extend) a path-effect on the chain. Same effectKind extends
+        // the remaining duration; new effectKinds get their own entry. The
+        // effective speed multiplier is the product across all active entries.
+        public void ApplySpeedModifier(string effectKind, PowerupDefinition def, float multiplier, float duration)
+        {
+            if (string.IsNullOrEmpty(effectKind) || duration <= 0f) return;
+
+            if (_activePathEffects.TryGetValue(effectKind, out var existing))
+            {
+                existing.SecondsRemaining += duration;
+                _activePathEffects[effectKind] = existing;
+            }
+            else
+            {
+                _activePathEffects[effectKind] = new ActivePathEffect
+                {
+                    Definition = def,
+                    Multiplier = multiplier,
+                    SecondsRemaining = duration,
+                };
+            }
+            RecomputeSpeedMultiplier();
+        }
+
+        private void TickPathEffects(float dt)
+        {
+            if (_activePathEffects.Count == 0) return;
+
+            _pathEffectKeyScratch.Clear();
+            foreach (var k in _activePathEffects.Keys) _pathEffectKeyScratch.Add(k);
+
+            bool anyRemoved = false;
+            foreach (var key in _pathEffectKeyScratch)
+            {
+                var pe = _activePathEffects[key];
+                pe.SecondsRemaining -= dt;
+                if (pe.SecondsRemaining <= 0f)
+                {
+                    _activePathEffects.Remove(key);
+                    anyRemoved = true;
+                }
+                else
+                {
+                    _activePathEffects[key] = pe;
+                }
+            }
+            if (anyRemoved) RecomputeSpeedMultiplier();
+        }
+
+        private void RecomputeSpeedMultiplier()
+        {
+            float m = 1f;
+            foreach (var pe in _activePathEffects.Values) m *= pe.Multiplier;
+            _effectiveSpeedMultiplier = m;
+        }
+
+        // Called when a player's projectile directly hits a special chain marble.
+        // Resolves the marble's PowerupDefinition through PathEffects.Create and
+        // applies; then destroys the special marble through the standard flow
+        // (which fires OnMarbleDestroyed + registers a pending seam).
+        public void OnPathMarbleHit(ChainMarble special)
+        {
+            if (special == null || special.SpecialPowerup == null) return;
+            var def = special.SpecialPowerup;
+            var effect = PathEffects.Create(def.EffectKind);
+            if (effect != null)
+            {
+                effect.Apply(this, def);
+                Debug.Log($"[NovaSpark.Path] Activated '{def.ContentId}' from chain marble.");
+            }
+            DestroyMarble(special);
         }
 
         // -------------------- spawning --------------------
@@ -91,22 +190,47 @@ namespace NovaSpark.Game.Chain
                 arc = _marbles[_marbles.Count - 1].ArcLength - _level.MarbleSpacing;
             }
             var color = _level.AllowedColors[Random.Range(0, _level.AllowedColors.Length)];
-            var marble = CreateMarble(color, arc, sortingOrder: _spawnedCount);
+
+            // Chance this marble is a path-effect "supply package" — drawn from
+            // RunState.RunPool's Path-kind subset. Doesn't change the marble's
+            // color (which still participates in matching normally).
+            PowerupDefinition specialDef = null;
+            if (_level.PathMarbleSpawnChance > 0f && Random.value < _level.PathMarbleSpawnChance)
+            {
+                specialDef = PickRandomPathFromRunPool();
+            }
+
+            var marble = CreateMarble(color, arc, sortingOrder: _spawnedCount, specialDef);
             _marbles.Add(marble);
             _spawnedCount++;
             if (_spawnedCount >= _level.TotalMarbles) _spawnComplete = true;
             OnChainChanged?.Invoke();
         }
 
-        private ChainMarble CreateMarble(MarbleColor color, float arc, int sortingOrder)
+        private PowerupDefinition PickRandomPathFromRunPool()
         {
-            var go = new GameObject($"Marble_{sortingOrder}_{color}");
+            _pathPoolScratch.Clear();
+            var pool = RunState.RunPool;
+            for (int i = 0; i < pool.Count; i++)
+            {
+                if (pool[i] != null && pool[i].Kind == PowerupKind.Path) _pathPoolScratch.Add(pool[i]);
+            }
+            if (_pathPoolScratch.Count == 0) return null;
+            return _pathPoolScratch[Random.Range(0, _pathPoolScratch.Count)];
+        }
+
+        private ChainMarble CreateMarble(MarbleColor color, float arc, int sortingOrder, PowerupDefinition specialDef = null)
+        {
+            var name = specialDef != null
+                ? $"Marble_{sortingOrder}_{color}_special_{specialDef.EffectKind}"
+                : $"Marble_{sortingOrder}_{color}";
+            var go = new GameObject(name);
             go.transform.SetParent(transform, false);
             go.AddComponent<SpriteRenderer>();
             go.AddComponent<Rigidbody2D>();
             go.AddComponent<CircleCollider2D>();
             var marble = go.AddComponent<ChainMarble>();
-            marble.Initialize(color, arc, _level.MarbleRadius, _sprite, sortingOrder);
+            marble.Initialize(color, arc, _level.MarbleRadius, _sprite, sortingOrder, specialDef);
             marble.transform.position = _path.SampleByDistance(arc);
             return marble;
         }
@@ -128,7 +252,8 @@ namespace NovaSpark.Game.Chain
             if (_marbles.Count == 0) return;
 
             int tail = _marbles.Count - 1;
-            _marbles[tail].ArcLength += _level.ChainAdvanceSpeed * dt;
+            float forwardSpeed = _level.ChainAdvanceSpeed * _effectiveSpeedMultiplier;
+            _marbles[tail].ArcLength += forwardSpeed * dt;
 
             float retreatStep = _level.ChainAdvanceSpeed * _level.CatchUpSpeedMultiplier * dt;
 

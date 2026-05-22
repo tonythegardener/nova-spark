@@ -22,6 +22,10 @@ namespace NovaSpark.Game.Powerups
 
         public bool IsExpired => _expired;
 
+        // Exposed so the powerup HUD can render the current countdown.
+        public int ShotsRemaining => _shotsRemaining;
+        public float SecondsRemaining => _secondsRemaining;
+
         public void Equip(PowerupDefinition def, PowerupContext ctx)
         {
             Definition = def;
