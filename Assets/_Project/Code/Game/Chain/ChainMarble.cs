@@ -11,6 +11,13 @@ namespace NovaSpark.Game.Chain
         public MarbleColor Color { get; private set; }
         public float ArcLength { get; set; }
 
+        // Set by MarbleChain when a destruction creates a gap that would NOT
+        // form a same-color run if the front retreated. Frozen marbles refuse
+        // to retreat in AdvanceChain — the back catches up instead, leaving a
+        // gap the player can shoot through. Cleared automatically when the
+        // marble's current arc reaches its natural position (gap closed).
+        public bool FrozenAfterGap { get; set; }
+
         private SpriteRenderer _sr;
 
         private void Awake()

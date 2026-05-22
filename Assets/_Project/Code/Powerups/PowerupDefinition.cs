@@ -12,6 +12,15 @@ namespace NovaSpark.Powerups
         Seconds = 4,     // expires after N seconds of in-level time
     }
 
+    // Categorizes the powerup for the acquisition + equip constraint system.
+    //   Shooter — modifies cannon, aim, projectile, queue. Max 1 equipped at a time.
+    //   Path    — modifies chain motion / match rules / chain state. Stacks freely.
+    public enum PowerupKind
+    {
+        Shooter = 0,
+        Path = 1,
+    }
+
     [CreateAssetMenu(
         fileName = "NewPowerup",
         menuName = "Nova Spark/Content/Powerup Definition",
@@ -31,6 +40,8 @@ namespace NovaSpark.Powerups
         [Tooltip("String key resolved by NovaSpark.Game.Powerups.PowerupEffects.Create. " +
                  "Examples: laser_sight, rapid_reload, long_scope, mimic_shot, explosive_round, vaporizer, knockout.")]
         [SerializeField] private string effectKind = "";
+        [Tooltip("Shooter modifies the cannon (max 1 equipped). Path modifies the chain (stacks).")]
+        [SerializeField] private PowerupKind kind = PowerupKind.Shooter;
         [Tooltip("Primary numeric parameter for the effect. Interpretation depends on effectKind.")]
         [SerializeField] private float magnitude = 1f;
         [Tooltip("Secondary numeric parameter. Effects that need only one param ignore this.")]
@@ -48,6 +59,7 @@ namespace NovaSpark.Powerups
         public string Description => description;
         public Sprite Icon => icon;
         public string EffectKind => effectKind;
+        public PowerupKind Kind => kind;
         public float Magnitude => magnitude;
         public float SecondaryMagnitude => secondaryMagnitude;
         public PowerupDurationKind DurationKind => durationKind;

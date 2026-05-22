@@ -18,6 +18,7 @@ MonoBehaviour:
   description: Projects a trajectory line from your cannon along the aim direction.
   icon: {fileID: 0}
   effectKind: laser_sight
+  kind: 0
   magnitude: 18
   secondaryMagnitude: 0
   durationKind: 4

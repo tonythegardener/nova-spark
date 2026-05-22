@@ -18,6 +18,7 @@ MonoBehaviour:
   description: Halves the cannon's cooldown between shots.
   icon: {fileID: 0}
   effectKind: rapid_reload
+  kind: 0
   magnitude: 0.5
   secondaryMagnitude: 0
   durationKind: 4

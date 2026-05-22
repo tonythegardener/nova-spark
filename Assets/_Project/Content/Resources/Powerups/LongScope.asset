@@ -18,6 +18,7 @@ MonoBehaviour:
   description: Reveals additional upcoming shots in the queue.
   icon: {fileID: 0}
   effectKind: long_scope
+  kind: 0
   magnitude: 3
   secondaryMagnitude: 0
   durationKind: 1

@@ -18,6 +18,7 @@ MonoBehaviour:
   description: Detonates on impact, destroying nearby marbles regardless of color.
   icon: {fileID: 0}
   effectKind: explosive_round
+  kind: 0
   magnitude: 1.2
   secondaryMagnitude: 0
   durationKind: 2

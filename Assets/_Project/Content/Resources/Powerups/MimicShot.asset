@@ -19,6 +19,7 @@ MonoBehaviour:
     settling.
   icon: {fileID: 0}
   effectKind: mimic_shot
+  kind: 0
   magnitude: 1
   secondaryMagnitude: 0
   durationKind: 2

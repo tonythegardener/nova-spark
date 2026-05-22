@@ -103,6 +103,7 @@ namespace NovaSpark.Editor
                 SetPrivate(so, "magnitude", 18f);   // line length in world units
                 SetPrivate(so, "durationKind", PowerupDurationKind.Seconds);
                 SetPrivate(so, "durationParam", 30f);
+                SetPrivate(so, "kind", PowerupKind.Shooter);
                 SetPrivate(so, "schemaVersion", 1);
             });
         }
@@ -118,6 +119,7 @@ namespace NovaSpark.Editor
                 SetPrivate(so, "magnitude", 0.5f);
                 SetPrivate(so, "durationKind", PowerupDurationKind.Seconds);
                 SetPrivate(so, "durationParam", 20f);
+                SetPrivate(so, "kind", PowerupKind.Shooter);
                 SetPrivate(so, "schemaVersion", 1);
             });
         }
@@ -133,6 +135,7 @@ namespace NovaSpark.Editor
                 SetPrivate(so, "magnitude", 3f);
                 SetPrivate(so, "durationKind", PowerupDurationKind.PerLevel);
                 SetPrivate(so, "durationParam", 1f);
+                SetPrivate(so, "kind", PowerupKind.Shooter);
                 SetPrivate(so, "schemaVersion", 1);
             });
         }
@@ -148,6 +151,7 @@ namespace NovaSpark.Editor
                 SetPrivate(so, "magnitude", 1f);
                 SetPrivate(so, "durationKind", PowerupDurationKind.PerShots);
                 SetPrivate(so, "durationParam", 5f);
+                SetPrivate(so, "kind", PowerupKind.Shooter);
                 SetPrivate(so, "schemaVersion", 1);
             });
         }
@@ -163,6 +167,7 @@ namespace NovaSpark.Editor
                 SetPrivate(so, "magnitude", 1.2f);  // explosion radius in world units
                 SetPrivate(so, "durationKind", PowerupDurationKind.PerShots);
                 SetPrivate(so, "durationParam", 3f);
+                SetPrivate(so, "kind", PowerupKind.Shooter);
                 SetPrivate(so, "schemaVersion", 1);
             });
         }
@@ -178,6 +183,7 @@ namespace NovaSpark.Editor
                 SetPrivate(so, "magnitude", 1f);
                 SetPrivate(so, "durationKind", PowerupDurationKind.PerShots);
                 SetPrivate(so, "durationParam", 5f);
+                SetPrivate(so, "kind", PowerupKind.Shooter);
                 SetPrivate(so, "schemaVersion", 1);
             });
         }
@@ -193,6 +199,7 @@ namespace NovaSpark.Editor
                 SetPrivate(so, "magnitude", 1f);
                 SetPrivate(so, "durationKind", PowerupDurationKind.PerShots);
                 SetPrivate(so, "durationParam", 3f);
+                SetPrivate(so, "kind", PowerupKind.Shooter);
                 SetPrivate(so, "schemaVersion", 1);
             });
         }

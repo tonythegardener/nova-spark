@@ -19,6 +19,7 @@ MonoBehaviour:
     settles where it next touches, or off-screen."
   icon: {fileID: 0}
   effectKind: knockout
+  kind: 0
   magnitude: 1
   secondaryMagnitude: 0
   durationKind: 2

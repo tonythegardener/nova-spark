@@ -19,6 +19,7 @@ MonoBehaviour:
     radius."
   icon: {fileID: 0}
   effectKind: vaporizer
+  kind: 0
   magnitude: 1
   secondaryMagnitude: 0
   durationKind: 2

@@ -116,9 +116,13 @@ namespace NovaSpark.Game.Chain
         // Phase 1a model: spawn pressure drives the chain from the TAIL.
         // The tail (last spawned, lowest arc) advances at ChainAdvanceSpeed.
         // Each marble closer to the head has a natural arc = trailing.arc + spacing.
-        // - If a marble is at or below its natural arc, snap forward (spawn pressure pushing).
-        // - If a marble is above its natural arc (a gap exists from a match), it retreats
-        //   at CatchUpSpeedMultiplier * speed until reconnected.
+        // - If current <= natural, snap forward (spawn pressure pushing). Clears the
+        //   frozen flag because the gap has closed.
+        // - If current > natural and the marble is FROZEN (Phase 1b.2b rule:
+        //   destruction left flanks that wouldn't form a match), HOLD position so
+        //   the gap stays open and the back catches up.
+        // - Otherwise retreat at CatchUpSpeedMultiplier * speed (same-color flanks
+        //   closing into a match).
         private void AdvanceChain(float dt)
         {
             if (_marbles.Count == 0) return;
@@ -135,6 +139,11 @@ namespace NovaSpark.Game.Chain
                 if (current <= natural)
                 {
                     _marbles[i].ArcLength = natural;
+                    _marbles[i].FrozenAfterGap = false;
+                }
+                else if (_marbles[i].FrozenAfterGap)
+                {
+                    // Hold position. Back will catch up; freeze clears when it does.
                 }
                 else
                 {
@@ -230,10 +239,15 @@ namespace NovaSpark.Game.Chain
         // Destroys marbles [L..R] inclusive. If both flanks survive, records the
         // head-side surviving marble as a pending seam so a future Tick can
         // recheck once the gap closes (Zuma cascade behavior).
+        // Phase 1b.2b: also decides whether to FREEZE the front segment based on
+        // whether retreating would form a same-color run >= MatchThreshold.
         private void DestroyRange(int L, int R)
         {
             ChainMarble headSideSurvivor = L > 0 ? _marbles[L - 1] : null;
             bool tailSideSurvivorExists = R < _marbles.Count - 1;
+            ChainMarble tailSideSurvivor = tailSideSurvivorExists ? _marbles[R + 1] : null;
+
+            bool shouldFreeze = ShouldFreezeFrontAfterDestruction(L, R, headSideSurvivor, tailSideSurvivor);
 
             for (int i = R; i >= L; i--)
             {
@@ -246,10 +260,45 @@ namespace NovaSpark.Game.Chain
             if (headSideSurvivor != null && tailSideSurvivorExists)
             {
                 _pendingSeams.Add(headSideSurvivor);
+                if (shouldFreeze) FreezeSegmentBackFrom(headSideSurvivor);
             }
 
             OnMatchResolved?.Invoke();
             OnChainChanged?.Invoke();
+        }
+
+        // Returns true if the destruction should freeze the front segment in place
+        // (because retreating wouldn't form a match), false if the front should
+        // retreat to close the gap and form a cascade match.
+        // Called BEFORE the destruction so indices L-1 and R+1 still reference the
+        // surviving flanks at their pre-destruction positions.
+        private bool ShouldFreezeFrontAfterDestruction(int L, int R, ChainMarble headFlank, ChainMarble tailFlank)
+        {
+            if (headFlank == null || tailFlank == null) return false; // no flank to freeze against
+            if (headFlank.Color != tailFlank.Color) return true;       // can't form a match
+            int totalRun = CountFlankColorRun(L - 1, R + 1, headFlank.Color);
+            return totalRun < _level.MatchThreshold;                   // not enough for a match
+        }
+
+        // Counts contiguous same-color marbles walking outward from both flanks of
+        // a (yet-to-be-destroyed) range. Used to predict if a retreat would form
+        // a match >= MatchThreshold.
+        private int CountFlankColorRun(int headFlankIdx, int tailFlankIdx, MarbleColor color)
+        {
+            int count = 0;
+            for (int i = headFlankIdx; i >= 0 && _marbles[i].Color == color; i--) count++;
+            for (int i = tailFlankIdx; i < _marbles.Count && _marbles[i].Color == color; i++) count++;
+            return count;
+        }
+
+        // Marks the head-side surviving marble and everything ahead of it (lower
+        // index = closer to Bastion) as frozen. Those marbles will hold position
+        // in AdvanceChain instead of retreating to close the gap.
+        private void FreezeSegmentBackFrom(ChainMarble headSideMarble)
+        {
+            int idx = _marbles.IndexOf(headSideMarble);
+            if (idx < 0) return;
+            for (int i = idx; i >= 0; i--) _marbles[i].FrozenAfterGap = true;
         }
 
         // Returns true if `headSide` and `tailSide` are adjacent in the chain
@@ -348,12 +397,12 @@ namespace NovaSpark.Game.Chain
                 }
                 else
                 {
-                    MaybeRegisterSeam(rangeStart, rangeEnd);
+                    MaybeRegisterSeamWithFreeze(rangeStart, rangeEnd);
                     rangeStart = toRemove[i];
                     rangeEnd = rangeStart;
                 }
             }
-            MaybeRegisterSeam(rangeStart, rangeEnd);
+            MaybeRegisterSeamWithFreeze(rangeStart, rangeEnd);
 
             // Now actually destroy, walking in reverse so earlier indices stay valid.
             for (int i = toRemove.Count - 1; i >= 0; i--)
@@ -369,11 +418,20 @@ namespace NovaSpark.Game.Chain
             return toRemove.Count;
         }
 
-        private void MaybeRegisterSeam(int rangeStart, int rangeEnd)
+        // Called BEFORE the actual destruction step in DestroyInRadius — indices
+        // still reference the surviving flanks. Registers a pending seam and
+        // applies the freeze rule per contiguous destroyed range.
+        private void MaybeRegisterSeamWithFreeze(int rangeStart, int rangeEnd)
         {
             ChainMarble headSide = rangeStart > 0 ? _marbles[rangeStart - 1] : null;
-            bool tailExists = rangeEnd < _marbles.Count - 1;
-            if (headSide != null && tailExists) _pendingSeams.Add(headSide);
+            ChainMarble tailSide = rangeEnd < _marbles.Count - 1 ? _marbles[rangeEnd + 1] : null;
+            if (headSide == null || tailSide == null) return;
+
+            _pendingSeams.Add(headSide);
+            if (ShouldFreezeFrontAfterDestruction(rangeStart, rangeEnd, headSide, tailSide))
+            {
+                FreezeSegmentBackFrom(headSide);
+            }
         }
 
         // Remove `marble` from the chain WITHOUT firing OnMarbleDestroyed
@@ -386,7 +444,10 @@ namespace NovaSpark.Game.Chain
             if (idx < 0) return false;
 
             ChainMarble headSide = idx > 0 ? _marbles[idx - 1] : null;
-            bool tailExists = idx < _marbles.Count - 1;
+            ChainMarble tailSide = idx + 1 < _marbles.Count ? _marbles[idx + 1] : null;
+            bool tailExists = tailSide != null;
+            bool shouldFreeze = headSide != null && tailSide != null
+                && ShouldFreezeFrontAfterDestruction(idx, idx, headSide, tailSide);
 
             // Don't fire OnMarbleDestroyed — the marble isn't really "destroyed",
             // it's being launched. Knockout will eventually settle it elsewhere
@@ -394,7 +455,11 @@ namespace NovaSpark.Game.Chain
             Destroy(marble.gameObject);
             _marbles.RemoveAt(idx);
 
-            if (headSide != null && tailExists) _pendingSeams.Add(headSide);
+            if (headSide != null && tailExists)
+            {
+                _pendingSeams.Add(headSide);
+                if (shouldFreeze) FreezeSegmentBackFrom(headSide);
+            }
 
             OnChainChanged?.Invoke();
             return true;
