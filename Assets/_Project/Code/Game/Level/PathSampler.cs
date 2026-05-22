@@ -30,6 +30,18 @@ namespace NovaSpark.Game.Level
 
         public Vector2 SampleByDistance(float arcLength)
         {
+            // Lead-in extrapolation: negative arcs extend behind path[0] along
+            // the reverse of (path[0] -> path[1]) so chain spawns can sit
+            // off-screen and march into the visible portion. (Tony 2026-05-21)
+            if (arcLength < 0f && _points.Length >= 2)
+            {
+                var dir = _points[1] - _points[0];
+                if (dir.sqrMagnitude > Mathf.Epsilon)
+                {
+                    return _points[0] + dir.normalized * arcLength;
+                }
+                return _points[0];
+            }
             if (arcLength <= 0f) return _points[0];
             if (arcLength >= TotalLength) return _points[_points.Length - 1];
 
@@ -44,6 +56,12 @@ namespace NovaSpark.Game.Level
 
         public Vector2 SampleTangent(float arcLength)
         {
+            // In the lead-in region the tangent is just the path[0]->path[1] dir.
+            if (arcLength < 0f && _points.Length >= 2)
+            {
+                var dir0 = _points[1] - _points[0];
+                return dir0.sqrMagnitude > Mathf.Epsilon ? dir0.normalized : Vector2.right;
+            }
             arcLength = Mathf.Clamp(arcLength, 0f, TotalLength);
             int i = 1;
             while (i < _points.Length - 1 && _cumulativeLength[i] < arcLength) i++;

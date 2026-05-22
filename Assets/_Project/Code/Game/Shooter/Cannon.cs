@@ -28,10 +28,12 @@ namespace NovaSpark.Game.Shooter
 
         // Visuals
         private SpriteRenderer _baseRenderer;
+        private SpriteRenderer _barrelStemRenderer; // tinted by effects (e.g., Vaporizer red)
         private SpriteRenderer _currentRenderer;
         private Transform _barrelPivot;
         private Transform _previewRoot;
         private readonly List<SpriteRenderer> _previewRenderers = new();
+        private static readonly Color s_barrelStemDefaultColor = new Color(0.55f, 0.58f, 0.66f, 1f);
 
         // Scratch buffer used by PickColor / OnChainChanged to avoid garbage.
         private readonly List<MarbleColor> _scratchColors = new();
@@ -96,6 +98,7 @@ namespace NovaSpark.Game.Shooter
             effect.Equip(def, ctx);
             _equippedEffects.Add(effect);
             RecomputeQueueLength();
+            RefreshBarrelTint();
             Debug.Log($"[NovaSpark.Cannon] Equipped powerup '{def.ContentId}' (effect '{def.EffectKind}', kind {def.Kind}, duration {def.DurationKind} {def.DurationParam}).");
         }
 
@@ -118,7 +121,26 @@ namespace NovaSpark.Game.Shooter
                     anyRemoved = true;
                 }
             }
-            if (anyRemoved) RecomputeQueueLength();
+            if (anyRemoved)
+            {
+                RecomputeQueueLength();
+                RefreshBarrelTint();
+            }
+        }
+
+        // Walks equipped effects; first non-null BarrelTint wins. Used to signal
+        // "loaded weapon" effects like Vaporizer (red barrel) where the chambered
+        // marble color shouldn't change.
+        private void RefreshBarrelTint()
+        {
+            if (_barrelStemRenderer == null) return;
+            Color color = s_barrelStemDefaultColor;
+            for (int i = 0; i < _equippedEffects.Count; i++)
+            {
+                var t = _equippedEffects[i].BarrelTint;
+                if (t.HasValue) { color = t.Value; break; }
+            }
+            _barrelStemRenderer.color = color;
         }
 
         // -------------------- update / input --------------------
@@ -408,7 +430,7 @@ namespace NovaSpark.Game.Shooter
             barrel.transform.SetParent(transform, false);
             _barrelPivot = barrel.transform;
 
-            NewSprite("BarrelStem", _barrelPivot, _sprite, new Color(0.55f, 0.58f, 0.66f, 1f),
+            _barrelStemRenderer = NewSprite("BarrelStem", _barrelPivot, _sprite, s_barrelStemDefaultColor,
                 scale: 0.45f, sortingOrder: 51, localPos: new Vector3(0f, 0.7f, 0f), nonUniformY: 2.0f);
 
             _currentRenderer = NewSprite("Current", _barrelPivot, _sprite, Color.white,

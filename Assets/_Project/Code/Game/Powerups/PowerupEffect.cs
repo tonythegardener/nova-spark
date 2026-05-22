@@ -129,5 +129,13 @@ namespace NovaSpark.Game.Powerups
 
         /// <summary>Extra preview slots beyond the default 1-next-preview. Max across equipped effects wins.</summary>
         public virtual int ExtraVisibleQueue => 0;
+
+        /// <summary>
+        /// Visual telegraph: if non-null, the Cannon tints its barrel stem with
+        /// this color while this effect is equipped. First non-null effect in
+        /// equip order wins. Used to signal Shooter-mode powerups that don't
+        /// otherwise change the chambered marble (e.g., Vaporizer).
+        /// </summary>
+        public virtual Color? BarrelTint => null;
     }
 }

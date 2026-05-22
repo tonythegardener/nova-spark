@@ -68,6 +68,11 @@ namespace NovaSpark.Game.Level
         [Range(0f, 0.5f)]
         [SerializeField] private float pathMarbleSpawnChance = 0.05f;
 
+        [Header("Spawn Lead-In")]
+        [Tooltip("World-units of invisible path the chain head emerges from before reaching path[0]. Marbles spawn off-screen and march into view.")]
+        [Min(0f)]
+        [SerializeField] private float leadInDistance = 5f;
+
         public string ContentId => contentId;
         public int SchemaVersion => schemaVersion;
         public string DisplayName => displayName;
@@ -96,6 +101,7 @@ namespace NovaSpark.Game.Level
         public float DropLifetimeSeconds => dropLifetimeSeconds;
 
         public float PathMarbleSpawnChance => pathMarbleSpawnChance;
+        public float LeadInDistance => leadInDistance;
 
         public MarbleColor[] AllowedColors => MarbleColors.All;
     }

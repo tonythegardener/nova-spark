@@ -27,8 +27,8 @@ namespace NovaSpark.Game.Chain
         public bool IsSpecial => SpecialPowerup != null;
 
         private SpriteRenderer _sr;
-        private SpriteRenderer _haloRenderer;
-        private float _haloPulseTime;
+        private SpriteRenderer _iconRenderer;
+        private float _iconPulseTime;
 
         private void Awake()
         {
@@ -60,7 +60,7 @@ namespace NovaSpark.Game.Chain
             rb.useFullKinematicContacts = true;
 
             SpecialPowerup = specialPowerup;
-            if (specialPowerup != null) BuildHalo(sprite, sortingOrder);
+            if (specialPowerup != null) BuildSpecialIcon(sortingOrder);
         }
 
         public void SetColor(MarbleColor color)
@@ -70,27 +70,42 @@ namespace NovaSpark.Game.Chain
             _sr.color = color.ToRGB();
         }
 
-        // Halo telegraphs "this marble is a path-effect package — direct hit
-        // activates." A larger semi-transparent ring behind the marble, pulsing.
-        private void BuildHalo(Sprite sprite, int sortingOrder)
+        // Telegraphs "this marble is a path-effect package — direct hit activates."
+        // Icon sits ON the marble (front), pulses scale gently. Per effectKind:
+        //   chrono_field -> snowflake
+        //   (others fall back to a small white ring placeholder until each gets
+        //    its own icon — Tony 2026-05-21)
+        private void BuildSpecialIcon(int sortingOrder)
         {
-            var go = new GameObject("Halo");
+            Sprite icon;
+            Color iconColor;
+            switch (SpecialPowerup.EffectKind)
+            {
+                case "chrono_field":
+                    icon = SpriteFactory.GetWhiteSnowflake();
+                    iconColor = new Color(0.78f, 0.92f, 1.0f, 0.95f); // pale cyan
+                    break;
+                default:
+                    icon = SpriteFactory.GetWhiteCircle();
+                    iconColor = new Color(1f, 1f, 1f, 0.55f);
+                    break;
+            }
+
+            var go = new GameObject("SpecialIcon");
             go.transform.SetParent(transform, false);
-            go.transform.localScale = Vector3.one * 1.8f;
-            _haloRenderer = go.AddComponent<SpriteRenderer>();
-            _haloRenderer.sprite = sprite;
-            _haloRenderer.color = new Color(1f, 1f, 1f, 0.35f);
-            _haloRenderer.sortingOrder = sortingOrder - 1;
+            go.transform.localScale = Vector3.one * 0.7f;
+            _iconRenderer = go.AddComponent<SpriteRenderer>();
+            _iconRenderer.sprite = icon;
+            _iconRenderer.color = iconColor;
+            _iconRenderer.sortingOrder = sortingOrder + 5; // on top of marble
         }
 
         private void Update()
         {
-            if (_haloRenderer == null) return;
-            _haloPulseTime += Time.deltaTime;
-            float pulse = 0.30f + 0.18f * Mathf.Sin(_haloPulseTime * 5f);
-            var c = _haloRenderer.color;
-            c.a = pulse;
-            _haloRenderer.color = c;
+            if (_iconRenderer == null) return;
+            _iconPulseTime += Time.deltaTime;
+            float scalePulse = 0.95f + 0.10f * Mathf.Sin(_iconPulseTime * 4f);
+            _iconRenderer.transform.localScale = Vector3.one * (0.7f * scalePulse);
         }
     }
 }

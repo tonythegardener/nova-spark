@@ -183,7 +183,9 @@ namespace NovaSpark.Game.Chain
             float arc;
             if (_marbles.Count == 0)
             {
-                arc = 0f;
+                // First marble spawns off-screen behind path[0] so it visually
+                // marches into the visible portion instead of popping in.
+                arc = -_level.LeadInDistance;
             }
             else
             {

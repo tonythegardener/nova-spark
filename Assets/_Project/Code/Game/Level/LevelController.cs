@@ -350,13 +350,13 @@ namespace NovaSpark.Game.Level
         }
 
         // Text-only HUD at the top-left showing equipped powerups + countdowns.
-        // Temporary until we do a proper icon pass (Tony 2026-05-21).
+        // Temporary until we do a proper icon pass.
         private void DrawPowerupHud()
         {
-            int x = 14;
+            int x = 16;
             int y = 14;
-            const int rowH = 22;
-            const int width = 360;
+            const int rowH = 30;
+            const int width = 480;
 
             int rowsShown = 0;
 
@@ -569,10 +569,10 @@ namespace NovaSpark.Game.Level
             _hudStyle = new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleLeft,
-                fontSize = 13,
+                fontSize = 18,
                 richText = true,
             };
-            _hudStyle.normal.textColor = new Color(0.88f, 0.90f, 0.95f);
+            _hudStyle.normal.textColor = new Color(0.92f, 0.94f, 0.98f);
             _stylesReady = true;
         }
 
