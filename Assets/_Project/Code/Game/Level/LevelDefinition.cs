@@ -55,6 +55,14 @@ namespace NovaSpark.Game.Level
         [SerializeField] private Vector2 cameraCenter = Vector2.zero;
         [SerializeField] private Color backgroundColor = new(0.05f, 0.06f, 0.10f, 1f);
 
+        [Header("Powerup Drops (in-level shooter pickups)")]
+        [Tooltip("Seconds between drop spawn attempts. <= 0 uses spawner default.")]
+        [SerializeField] private float dropSpawnIntervalSeconds = 22f;
+        [Tooltip("Max concurrent uncollected drops on screen. <= 0 uses spawner default.")]
+        [SerializeField] private int dropMaxConcurrent = 2;
+        [Tooltip("Seconds each drop lingers before expiring uncollected. <= 0 uses spawner default.")]
+        [SerializeField] private float dropLifetimeSeconds = 15f;
+
         public string ContentId => contentId;
         public int SchemaVersion => schemaVersion;
         public string DisplayName => displayName;
@@ -77,6 +85,10 @@ namespace NovaSpark.Game.Level
         public float CameraOrthographicSize => cameraOrthographicSize;
         public Vector2 CameraCenter => cameraCenter;
         public Color BackgroundColor => backgroundColor;
+
+        public float DropSpawnIntervalSeconds => dropSpawnIntervalSeconds;
+        public int DropMaxConcurrent => dropMaxConcurrent;
+        public float DropLifetimeSeconds => dropLifetimeSeconds;
 
         public MarbleColor[] AllowedColors => MarbleColors.All;
     }

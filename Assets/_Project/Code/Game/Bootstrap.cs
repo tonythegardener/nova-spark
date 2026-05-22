@@ -1,4 +1,6 @@
 using NovaSpark.Mods;
+using NovaSpark.Powerups;
+using NovaSpark.Run;
 using UnityEngine;
 
 namespace NovaSpark.Game
@@ -15,6 +17,16 @@ namespace NovaSpark.Game
             ContentRegistry.Clear();
             LoadAllContent();
             LogRegisteredContent();
+            InitializeRunStateMetaPool();
+        }
+
+        // Seed RunState.metaPool with every PowerupDefinition we have. For
+        // Phase 1 this is "everything that exists"; meta unlocks in Phase 4 will
+        // gate which definitions count as "unlocked" for the player.
+        private static void InitializeRunStateMetaPool()
+        {
+            RunState.InitializeMetaPool(ContentRegistry.All<PowerupDefinition>());
+            Debug.Log($"[NovaSpark] RunState meta pool initialized with {RunState.MetaPool.Count} powerups.");
         }
 
         private static void LoadAllContent()

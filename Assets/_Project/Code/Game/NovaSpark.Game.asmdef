@@ -5,6 +5,7 @@
         "NovaSpark.Core",
         "NovaSpark.Mods",
         "NovaSpark.Powerups",
+        "NovaSpark.Run",
         "Unity.InputSystem"
     ],
     "includePlatforms": [],

@@ -73,10 +73,27 @@ namespace NovaSpark.Game.Shooter
             if (def == null) return;
             var effect = PowerupEffects.Create(def.EffectKind);
             if (effect == null) return;
+
+            // Max-1 Shooter rule (Tony 2026-05-21). Picking up a new Shooter-type
+            // unequips the current one. Path-type effects stack freely.
+            if (def.Kind == PowerupKind.Shooter)
+            {
+                for (int i = _equippedEffects.Count - 1; i >= 0; i--)
+                {
+                    if (_equippedEffects[i].Definition != null
+                        && _equippedEffects[i].Definition.Kind == PowerupKind.Shooter)
+                    {
+                        Debug.Log($"[NovaSpark.Cannon] Replacing Shooter '{_equippedEffects[i].Definition.ContentId}' with '{def.ContentId}'.");
+                        _equippedEffects[i].Unequip();
+                        _equippedEffects.RemoveAt(i);
+                    }
+                }
+            }
+
             effect.Equip(def, ctx);
             _equippedEffects.Add(effect);
             RecomputeQueueLength();
-            Debug.Log($"[NovaSpark.Cannon] Equipped powerup '{def.ContentId}' (effect '{def.EffectKind}', duration {def.DurationKind} {def.DurationParam}).");
+            Debug.Log($"[NovaSpark.Cannon] Equipped powerup '{def.ContentId}' (effect '{def.EffectKind}', kind {def.Kind}, duration {def.DurationKind} {def.DurationParam}).");
         }
 
         public void UnequipAll()

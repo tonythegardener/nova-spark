@@ -1,5 +1,6 @@
 using NovaSpark.Core;
 using NovaSpark.Game.Chain;
+using NovaSpark.Game.Powerups;
 using UnityEngine;
 
 namespace NovaSpark.Game.Shooter
@@ -70,6 +71,18 @@ namespace NovaSpark.Game.Shooter
             // Destroy(gameObject) takes effect at end-of-frame.
             if (_consumed) return;
 
+            // Powerup drop has priority — if the projectile hits one, that
+            // consumes the shot. No chain insertion happens even if a chain
+            // marble is also part of the collision.
+            var drop = collision.collider.GetComponentInParent<PowerupDrop>();
+            if (drop != null)
+            {
+                _consumed = true;
+                drop.OnHitByProjectile();
+                DisableAndDestroy();
+                return;
+            }
+
             var hit = collision.collider.GetComponentInParent<ChainMarble>();
             if (hit == null) return;
 
@@ -85,12 +98,16 @@ namespace NovaSpark.Game.Shooter
                 _chain.TryInsertAt(hit, velocity, _color);
             }
 
+            DisableAndDestroy();
+        }
+
+        private void DisableAndDestroy()
+        {
             // Disable collider + zero velocity so no further physics step this
             // frame can re-fire collision before Destroy() lands.
             var col = GetComponent<CircleCollider2D>();
             if (col != null) col.enabled = false;
             if (_rb != null) _rb.linearVelocity = Vector2.zero;
-
             Destroy(gameObject);
         }
     }

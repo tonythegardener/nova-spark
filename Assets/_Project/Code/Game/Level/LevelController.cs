@@ -5,6 +5,7 @@ using NovaSpark.Game.Powerups;
 using NovaSpark.Game.Shooter;
 using NovaSpark.Mods;
 using NovaSpark.Powerups;
+using NovaSpark.Run;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -12,20 +13,27 @@ namespace NovaSpark.Game.Level
 {
     public sealed class LevelController : MonoBehaviour
     {
-        private enum AppState { LevelSelect, Playing, Paused, Won, Lost }
+        private enum AppState { LevelSelect, Playing, Paused, Won, Draft, Lost }
+
+        private const int DraftOptionsCount = 3;
 
         private AppState _state = AppState.LevelSelect;
         private LevelDefinition _level;
         private PathSampler _path;
         private MarbleChain _chain;
         private Cannon _shooter;
+        private DropSpawner _dropSpawner;
         private Sprite _circle;
         private Camera _camera;
         private Transform _levelRoot;
+        private PowerupContext _ctx;
 
         private Vector3 _cameraHome;
         private float _shakeTimeLeft;
         private float _shakeAmplitude;
+
+        // Cached draft options when transitioning to Draft state
+        private readonly List<PowerupDefinition> _draftOptions = new();
 
         // OnGUI cached styles
         private Texture2D _panelBg;
@@ -94,6 +102,10 @@ namespace NovaSpark.Game.Level
                 return;
             }
 
+            // RunState bookkeeping. Starts a fresh run on first entry.
+            if (!RunState.RunActive) RunState.StartNewRun();
+            RunState.EnterLevel(contentId);
+
             _level = def;
             _path = new PathSampler(_level.Waypoints);
             ConfigureCameraForLevel(_level);
@@ -105,11 +117,13 @@ namespace NovaSpark.Game.Level
             BuildBastionMarker();
             BuildChain();
             BuildCannon();
+            BuildDropSpawner();
 
             _state = AppState.Playing;
             Time.timeScale = 1f;
             Debug.Log($"[NovaSpark] Level '{_level.DisplayName}' started: path length {_path.TotalLength:F2}, " +
-                      $"speed {_level.ChainAdvanceSpeed}, marbles {_level.TotalMarbles}");
+                      $"speed {_level.ChainAdvanceSpeed}, marbles {_level.TotalMarbles}, " +
+                      $"runPool {RunState.RunPool.Count} powerups.");
         }
 
         private void TearDownLevel()
@@ -121,8 +135,10 @@ namespace NovaSpark.Game.Level
             }
             _chain = null;
             _shooter = null;
+            _dropSpawner = null;
             _path = null;
             _level = null;
+            _ctx = null;
         }
 
         private void GoToLevelSelect()
@@ -142,10 +158,7 @@ namespace NovaSpark.Game.Level
             var line = go.AddComponent<LineRenderer>();
             line.useWorldSpace = true;
             line.positionCount = _path.Points.Count;
-            for (int i = 0; i < _path.Points.Count; i++)
-            {
-                line.SetPosition(i, _path.Points[i]);
-            }
+            for (int i = 0; i < _path.Points.Count; i++) line.SetPosition(i, _path.Points[i]);
             line.startWidth = _level.MarbleRadius * 2.05f;
             line.endWidth = _level.MarbleRadius * 2.05f;
             var mat = new Material(Shader.Find("Sprites/Default"));
@@ -187,15 +200,16 @@ namespace NovaSpark.Game.Level
             _shooter = shooterGo.AddComponent<Cannon>();
             _shooter.Configure(_level, _chain, _camera, _circle);
 
-            // Phase 1b.1 debug: auto-equip every registered PowerupDefinition so
-            // Tony can see all effects active in the playtest. The draft loop
-            // (RunState + Draft UI) lands in 1b.2; until then this is the visible
-            // proof that the framework works.
-            var ctx = new PowerupContext(_level, _chain, _camera, _shooter, _shooter.BarrelMuzzle);
-            foreach (var def in ContentRegistry.All<PowerupDefinition>())
-            {
-                _shooter.EquipPowerup(def, ctx);
-            }
+            // 1b.2c: cannon starts naked. Powerups arrive via in-level drops.
+            _ctx = new PowerupContext(_level, _chain, _camera, _shooter, _shooter.BarrelMuzzle);
+        }
+
+        private void BuildDropSpawner()
+        {
+            var go = new GameObject("DropSpawner");
+            go.transform.SetParent(_levelRoot, false);
+            _dropSpawner = go.AddComponent<DropSpawner>();
+            _dropSpawner.Configure(_level, _path, _camera, _shooter, _ctx);
         }
 
         // -------------------- update / input --------------------
@@ -219,19 +233,14 @@ namespace NovaSpark.Game.Level
 
             switch (_state)
             {
-                case AppState.Playing:
-                    Pause();
-                    break;
-                case AppState.Paused:
-                    Resume();
-                    break;
+                case AppState.Playing: Pause(); break;
+                case AppState.Paused:  Resume(); break;
                 case AppState.Won:
                 case AppState.Lost:
+                case AppState.Draft:
                     GoToLevelSelect();
                     break;
-                case AppState.LevelSelect:
-                    // no-op; user can click Quit instead
-                    break;
+                case AppState.LevelSelect: break;
             }
         }
 
@@ -256,8 +265,20 @@ namespace NovaSpark.Game.Level
         private void OnWon()
         {
             if (_state != AppState.Playing) return;
-            _state = AppState.Won;
             if (_shooter != null) _shooter.SetFiringEnabled(false);
+            RunState.OnLevelWon();
+
+            // Try to draft; if the meta pool is exhausted, skip straight to Won.
+            _draftOptions.Clear();
+            _draftOptions.AddRange(RunState.SampleDraftOptions(DraftOptionsCount));
+            if (_draftOptions.Count > 0)
+            {
+                _state = AppState.Draft;
+            }
+            else
+            {
+                _state = AppState.Won;
+            }
         }
 
         private void OnLost()
@@ -265,6 +286,15 @@ namespace NovaSpark.Game.Level
             if (_state != AppState.Playing) return;
             _state = AppState.Lost;
             if (_shooter != null) _shooter.SetFiringEnabled(false);
+            // Single-loss = run end (Tony 2026-05-21).
+            RunState.OnLevelLost();
+        }
+
+        private void PickDraftOption(PowerupDefinition def)
+        {
+            RunState.AddToRunPool(def);
+            _draftOptions.Clear();
+            _state = AppState.Won;
         }
 
         // -------------------- camera shake --------------------
@@ -303,6 +333,7 @@ namespace NovaSpark.Game.Level
             {
                 case AppState.LevelSelect: DrawLevelSelect(); break;
                 case AppState.Paused:      DrawPauseMenu();   break;
+                case AppState.Draft:       DrawDraftOverlay(); break;
                 case AppState.Won:         DrawEndScreen(true);  break;
                 case AppState.Lost:        DrawEndScreen(false); break;
             }
@@ -315,15 +346,17 @@ namespace NovaSpark.Game.Level
 
             int rowH = 56;
             int rowGap = 8;
-            int contentH = 110 + levels.Count * (rowH + rowGap) + 70;
-            int contentW = 520;
+            int contentH = 110 + levels.Count * (rowH + rowGap) + 80;
+            int contentW = 540;
             var boxRect = CenteredBox(contentW, contentH);
 
             GUI.Box(boxRect, GUIContent.none, _panelStyle);
             GUI.Label(new Rect(boxRect.x, boxRect.y + 22, boxRect.width, 50),
                 "NOVA SPARK", _titleStyle);
-            GUI.Label(new Rect(boxRect.x, boxRect.y + 68, boxRect.width, 30),
-                "Select a sector", _bodyStyle);
+            string subtitle = RunState.RunActive
+                ? $"<size=14>Run in progress — pool: {RunState.RunPool.Count} powerups</size>"
+                : "Select a sector";
+            GUI.Label(new Rect(boxRect.x, boxRect.y + 68, boxRect.width, 30), subtitle, _bodyStyle);
 
             int y = (int)boxRect.y + 110;
             foreach (var lv in levels)
@@ -370,7 +403,37 @@ namespace NovaSpark.Game.Level
             by += btnH + gap;
             if (GUI.Button(new Rect(bx, by, btnW, btnH), "Quit to Level Select", _buttonStyle))
             {
+                // Keeps the run alive (Tony 2026-05-21). Run pool persists.
                 GoToLevelSelect();
+            }
+        }
+
+        private void DrawDraftOverlay()
+        {
+            int rowH = 80;
+            int rowGap = 12;
+            int contentH = 130 + _draftOptions.Count * (rowH + rowGap) + 20;
+            int contentW = 600;
+            var boxRect = CenteredBox(contentW, contentH);
+            GUI.Box(boxRect, GUIContent.none, _panelStyle);
+
+            DrawTitle(boxRect, "Recovered intel", new Color(0.55f, 0.95f, 0.65f));
+            GUI.Label(new Rect(boxRect.x, boxRect.y + 70, boxRect.width, 30),
+                "<size=14>Add one powerup to your run pool — it will start appearing as drops.</size>",
+                _bodyStyle);
+
+            int y = (int)boxRect.y + 110;
+            for (int i = 0; i < _draftOptions.Count; i++)
+            {
+                var def = _draftOptions[i];
+                var label = $"<b>{def.DisplayName}</b>  <size=12>[{def.Kind}, {def.DurationKind} {def.DurationParam}]</size>\n<size=11>{def.Description}</size>";
+                var btnRect = new Rect(boxRect.x + 30, y, boxRect.width - 60, rowH);
+                if (GUI.Button(btnRect, label, _buttonStyle))
+                {
+                    PickDraftOption(def);
+                    return;
+                }
+                y += rowH + rowGap;
             }
         }
 
@@ -389,7 +452,9 @@ namespace NovaSpark.Game.Level
             int btnW = 220, btnH = 44, gap = 10;
             int by = (int)boxRect.y + 95;
             int bx = (int)boxRect.x + (int)((boxRect.width - btnW) / 2);
-            if (GUI.Button(new Rect(bx, by, btnW, btnH), "Replay Level", _buttonStyle))
+
+            string replayLabel = won ? "Replay Level" : "Restart Run";
+            if (GUI.Button(new Rect(bx, by, btnW, btnH), replayLabel, _buttonStyle))
             {
                 if (_level != null) LoadLevel(_level.ContentId);
             }
@@ -432,6 +497,7 @@ namespace NovaSpark.Game.Level
                 fontSize = 16,
                 alignment = TextAnchor.MiddleCenter,
                 richText = true,
+                wordWrap = true,
             };
             _stylesReady = true;
         }
