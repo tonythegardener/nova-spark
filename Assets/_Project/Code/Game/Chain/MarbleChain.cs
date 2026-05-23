@@ -180,18 +180,62 @@ namespace NovaSpark.Game.Chain
         // Called when a player's projectile directly hits a special chain marble.
         // Resolves the marble's PowerupDefinition through PathEffects.Create and
         // applies; then destroys the special marble through the standard flow
-        // (which fires OnMarbleDestroyed + registers a pending seam).
+        // (which fires OnMarbleDestroyed + registers a pending seam). Passes
+        // activateSpecials=false so the destruction step doesn't double-activate.
         public void OnPathMarbleHit(ChainMarble special)
         {
             if (special == null || special.SpecialPowerup == null) return;
-            var def = special.SpecialPowerup;
+            ActivateSpecialPowerup(special, source: "direct hit");
+            int idx = _marbles.IndexOf(special);
+            if (idx >= 0) DestroyRange(idx, idx, activateSpecials: false);
+        }
+
+        // Used by the debug spawn-powerup panel. Picks a random plain marble
+        // and tags it as a path-effect supply package of `def`. Returns false
+        // if no plain marbles exist in the chain.
+        public bool AssignRandomSpecialMarble(PowerupDefinition def)
+        {
+            if (def == null) return false;
+            int candidateCount = 0;
+            for (int i = 0; i < _marbles.Count; i++)
+            {
+                if (_marbles[i] != null && !_marbles[i].IsSpecial) candidateCount++;
+            }
+            if (candidateCount == 0) return false;
+
+            int target = Random.Range(0, candidateCount);
+            int seen = 0;
+            for (int i = 0; i < _marbles.Count; i++)
+            {
+                if (_marbles[i] != null && !_marbles[i].IsSpecial)
+                {
+                    if (seen == target)
+                    {
+                        _marbles[i].AssignSpecialPowerup(def);
+                        Debug.Log($"[NovaSpark.Debug] Assigned '{def.ContentId}' to marble index {i}.");
+                        return true;
+                    }
+                    seen++;
+                }
+            }
+            return false;
+        }
+
+        // Helper called whenever a chain marble is destroyed via any path. If
+        // the marble carries a SpecialPowerup tag, apply its path effect before
+        // the destruction completes. Tony 2026-05-21: collateral destruction
+        // (Explosive radius, match cascade, Vaporize, etc.) should ALSO trigger
+        // the effect — not just direct hits.
+        private void ActivateSpecialPowerup(ChainMarble marble, string source)
+        {
+            if (marble == null || marble.SpecialPowerup == null) return;
+            var def = marble.SpecialPowerup;
             var effect = PathEffects.Create(def.EffectKind);
             if (effect != null)
             {
                 effect.Apply(this, def);
-                Debug.Log($"[NovaSpark.Path] Activated '{def.ContentId}' from chain marble.");
+                Debug.Log($"[NovaSpark.Path] Activated '{def.ContentId}' ({source}).");
             }
-            DestroyMarble(special);
         }
 
         // -------------------- spawning --------------------
@@ -397,13 +441,20 @@ namespace NovaSpark.Game.Chain
         // recheck once the gap closes (Zuma cascade behavior).
         // Phase 1b.2b: also decides whether to FREEZE the front segment based on
         // whether retreating would form a same-color run >= MatchThreshold.
-        private void DestroyRange(int L, int R)
+        // Phase 1b.2d: activates any SpecialPowerup tags on destroyed marbles
+        // (collateral activation) unless caller asks to skip (OnPathMarbleHit).
+        private void DestroyRange(int L, int R, bool activateSpecials = true)
         {
             ChainMarble headSideSurvivor = L > 0 ? _marbles[L - 1] : null;
             bool tailSideSurvivorExists = R < _marbles.Count - 1;
             ChainMarble tailSideSurvivor = tailSideSurvivorExists ? _marbles[R + 1] : null;
 
             bool shouldFreeze = ShouldFreezeFrontAfterDestruction(L, R, headSideSurvivor, tailSideSurvivor);
+
+            if (activateSpecials)
+            {
+                for (int i = L; i <= R; i++) ActivateSpecialPowerup(_marbles[i], "collateral");
+            }
 
             for (int i = R; i >= L; i--)
             {
@@ -559,6 +610,13 @@ namespace NovaSpark.Game.Chain
                 }
             }
             MaybeRegisterSeamWithFreeze(rangeStart, rangeEnd);
+
+            // Activate any special path-marbles that are about to be destroyed
+            // by the blast (collateral activation — Tony 2026-05-21).
+            for (int i = 0; i < toRemove.Count; i++)
+            {
+                ActivateSpecialPowerup(_marbles[toRemove[i]], "collateral (explosive)");
+            }
 
             // Now actually destroy, walking in reverse so earlier indices stay valid.
             for (int i = toRemove.Count - 1; i >= 0; i--)

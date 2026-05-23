@@ -42,6 +42,7 @@ namespace NovaSpark.Game.Level
         private GUIStyle _bodyStyle;
         private GUIStyle _buttonStyle;
         private GUIStyle _hudStyle;
+        private GUIStyle _debugButtonStyle;
         private bool _stylesReady;
 
         private void Start()
@@ -446,21 +447,27 @@ namespace NovaSpark.Game.Level
 
         private void DrawPauseMenu()
         {
-            int w = 440, h = 260;
+            var allPowerups = new List<PowerupDefinition>(ContentRegistry.All<PowerupDefinition>());
+            allPowerups.Sort((a, b) => string.CompareOrdinal(a.ContentId, b.ContentId));
+
+            int w = 560;
+            int btnW = 240, btnH = 40, gap = 8;
+            int debugBtnH = 28, debugCols = 3;
+            int debugBtnW = (w - 40 - (debugCols - 1) * 6) / debugCols;
+            int debugRows = (allPowerups.Count + debugCols - 1) / debugCols;
+            int debugSectionH = 28 + debugRows * (debugBtnH + 4) + 6;
+
+            int h = 80 /*title*/ + 3 * (btnH + gap) + 16 /*sep*/ + debugSectionH + 20;
             var boxRect = CenteredBox(w, h);
             GUI.Box(boxRect, GUIContent.none, _panelStyle);
 
             var titleColor = new Color(0.85f, 0.90f, 0.95f);
             DrawTitle(boxRect, "Paused", titleColor);
 
-            int btnW = 220, btnH = 44, gap = 10;
-            int by = (int)boxRect.y + 95;
+            int by = (int)boxRect.y + 80;
             int bx = (int)boxRect.x + (int)((boxRect.width - btnW) / 2);
 
-            if (GUI.Button(new Rect(bx, by, btnW, btnH), "Resume", _buttonStyle))
-            {
-                Resume();
-            }
+            if (GUI.Button(new Rect(bx, by, btnW, btnH), "Resume", _buttonStyle)) Resume();
             by += btnH + gap;
             if (GUI.Button(new Rect(bx, by, btnW, btnH), "Restart Level", _buttonStyle))
             {
@@ -472,6 +479,55 @@ namespace NovaSpark.Game.Level
             {
                 // Keeps the run alive (Tony 2026-05-21). Run pool persists.
                 GoToLevelSelect();
+            }
+            by += btnH + 14;
+
+            // -------- Debug spawn powerup --------
+            GUI.Label(new Rect(boxRect.x, by, boxRect.width, 24),
+                "<size=13>DEBUG — spawn powerup (Shooter equips on cannon, Path tags a random chain marble)</size>",
+                _bodyStyle);
+            by += 28;
+
+            int col = 0;
+            int rowX = (int)boxRect.x + 20;
+            for (int i = 0; i < allPowerups.Count; i++)
+            {
+                var def = allPowerups[i];
+                var btnRect = new Rect(rowX + col * (debugBtnW + 6), by, debugBtnW, debugBtnH);
+                string colorHex = def.Kind == PowerupKind.Path ? "#ffd28a" : "#a8c0ff";
+                string label = $"<color={colorHex}>{def.DisplayName}</color>";
+                if (GUI.Button(btnRect, label, _debugButtonStyle))
+                {
+                    DebugSpawnPowerup(def);
+                }
+                col++;
+                if (col >= debugCols)
+                {
+                    col = 0;
+                    by += debugBtnH + 4;
+                }
+            }
+        }
+
+        // Wired by the pause menu's debug spawn buttons. Mimics the player
+        // either collecting a drop (Shooter) or shooting a path-marble (Path).
+        // Standard durations apply from this moment.
+        private void DebugSpawnPowerup(PowerupDefinition def)
+        {
+            if (def == null) return;
+            if (def.Kind == PowerupKind.Shooter)
+            {
+                if (_shooter != null && _ctx != null)
+                {
+                    _shooter.EquipPowerup(def, _ctx);
+                }
+            }
+            else if (def.Kind == PowerupKind.Path)
+            {
+                if (_chain != null && !_chain.AssignRandomSpecialMarble(def))
+                {
+                    Debug.Log("[NovaSpark.Debug] No plain chain marbles available to tag for path effect.");
+                }
             }
         }
 
@@ -573,6 +629,15 @@ namespace NovaSpark.Game.Level
                 richText = true,
             };
             _hudStyle.normal.textColor = new Color(0.92f, 0.94f, 0.98f);
+
+            _debugButtonStyle = new GUIStyle(GUI.skin.button)
+            {
+                fontSize = 12,
+                alignment = TextAnchor.MiddleCenter,
+                richText = true,
+                wordWrap = false,
+            };
+
             _stylesReady = true;
         }
 

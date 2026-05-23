@@ -70,6 +70,24 @@ namespace NovaSpark.Game.Chain
             _sr.color = color.ToRGB();
         }
 
+        // Convert an already-spawned chain marble into a path-effect special
+        // (or back to plain). Used by the debug-spawn pause menu so testers
+        // can force a specific path effect to appear in the chain.
+        public void AssignSpecialPowerup(PowerupDefinition def)
+        {
+            if (_iconRenderer != null)
+            {
+                Destroy(_iconRenderer.gameObject);
+                _iconRenderer = null;
+            }
+            SpecialPowerup = def;
+            if (def != null)
+            {
+                int order = _sr != null ? _sr.sortingOrder : 0;
+                BuildSpecialIcon(order);
+            }
+        }
+
         // Telegraphs "this marble is a path-effect package — direct hit activates."
         // Icon sits ON the marble (front), pulses scale gently. Per effectKind:
         //   chrono_field -> snowflake
