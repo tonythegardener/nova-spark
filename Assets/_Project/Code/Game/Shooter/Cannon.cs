@@ -43,6 +43,13 @@ namespace NovaSpark.Game.Shooter
         // Exposed so the LevelController HUD can list active effects + timers.
         public IReadOnlyList<PowerupEffect> EquippedEffects => _equippedEffects;
 
+        // When true, player input is suppressed and an equipped effect is
+        // driving aim + fire (Auto Shot). The effect calls Fire(dir) directly
+        // and rotates BarrelMuzzle each tick.
+        private bool _autoControlled;
+        public bool IsAutoControlled => _autoControlled;
+        public void SetAutoControlled(bool value) => _autoControlled = value;
+
         public void Configure(LevelDefinition level, MarbleChain chain, Camera cam, Sprite sprite)
         {
             _level = level;
@@ -150,28 +157,43 @@ namespace NovaSpark.Game.Shooter
             if (_level == null) return;
             _cooldownRemaining = Mathf.Max(0f, _cooldownRemaining - Time.deltaTime);
 
-            // Effects tick + their Seconds-based expiry
+            // Effects tick first so an auto-controlling effect can rotate the
+            // barrel and call Fire() during its TickLifetime/OnUpdate. The aim
+            // dispatch below picks up whatever rotation it set.
             for (int i = 0; i < _equippedEffects.Count; i++) _equippedEffects[i].TickLifetime(Time.deltaTime);
 
-            var mouse = Mouse.current;
-            if (mouse == null) { PruneExpiredEffects(); return; }
-
             Vector2 origin = _barrelPivot != null ? (Vector2)_barrelPivot.position : (Vector2)transform.position;
-            Vector2 aimWorld = ReadMouseWorld(mouse);
-            Vector2 dir = (aimWorld - (Vector2)transform.position);
-            if (dir.sqrMagnitude < 0.0001f) dir = Vector2.up;
-            dir.Normalize();
-            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - 90f;
-            _barrelPivot.rotation = Quaternion.Euler(0f, 0f, angle);
+            Vector2 dir;
+
+            if (_autoControlled)
+            {
+                // Auto Shot is driving — read aim from the barrel's current rotation.
+                // Player input (mouse aim, LMB, swap) is suppressed.
+                float zAngle = _barrelPivot.rotation.eulerAngles.z + 90f;
+                float rad = zAngle * Mathf.Deg2Rad;
+                dir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
+            }
+            else
+            {
+                var mouse = Mouse.current;
+                if (mouse == null) { PruneExpiredEffects(); return; }
+
+                Vector2 aimWorld = ReadMouseWorld(mouse);
+                dir = (aimWorld - (Vector2)transform.position);
+                if (dir.sqrMagnitude < 0.0001f) dir = Vector2.up;
+                dir.Normalize();
+                float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - 90f;
+                _barrelPivot.rotation = Quaternion.Euler(0f, 0f, angle);
+
+                if (_firingEnabled && SwapShotPressed()) RotateShotQueue();
+
+                if (_firingEnabled && mouse.leftButton.wasPressedThisFrame && _cooldownRemaining <= 0f)
+                {
+                    Fire(dir);
+                }
+            }
 
             for (int i = 0; i < _equippedEffects.Count; i++) _equippedEffects[i].OnAim(origin, dir);
-
-            if (_firingEnabled && SwapShotPressed()) RotateShotQueue();
-
-            if (_firingEnabled && mouse.leftButton.wasPressedThisFrame && _cooldownRemaining <= 0f)
-            {
-                Fire(dir);
-            }
 
             PruneExpiredEffects();
         }
@@ -208,8 +230,14 @@ namespace NovaSpark.Game.Shooter
 
         // -------------------- fire --------------------
 
-        private void Fire(Vector2 dir)
+        // Public so auto-controlling effects (Auto Shot) can fire on their own
+        // cadence. Returns true if a projectile was actually launched; false if
+        // firing is disabled or cooldown isn't ready yet.
+        public bool Fire(Vector2 dir)
         {
+            if (!_firingEnabled || _level == null) return false;
+            if (_cooldownRemaining > 0f) return false;
+
             float cd = _level.ShooterCooldown;
             for (int i = 0; i < _equippedEffects.Count; i++) cd = _equippedEffects[i].ModifyCooldown(cd);
             _cooldownRemaining = Mathf.Max(0.01f, cd);
@@ -246,6 +274,7 @@ namespace NovaSpark.Game.Shooter
             _shotQueue.RemoveAt(0);
             _shotQueue.Add(PickColor());
             RefreshChamberAndPreviewColors();
+            return true;
         }
 
         // Orchestrates a projectile hit: walks effects looking for one that

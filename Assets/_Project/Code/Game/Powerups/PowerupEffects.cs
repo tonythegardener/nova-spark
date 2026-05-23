@@ -20,6 +20,7 @@ namespace NovaSpark.Game.Powerups
                 case "explosive_round": return new ExplosiveRoundEffect();
                 case "vaporizer":       return new VaporizerEffect();
                 case "knockout":        return new KnockoutRoundEffect();
+                case "auto_shot":       return new AutoShotEffect();
                 default:
                     Debug.LogWarning($"[NovaSpark.Powerups] Unknown effectKind '{effectKind}' — no effect created.");
                     return null;
