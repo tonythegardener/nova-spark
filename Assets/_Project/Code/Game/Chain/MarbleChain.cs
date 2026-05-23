@@ -84,10 +84,39 @@ namespace NovaSpark.Game.Chain
         {
             TickPathEffects(dt);
             HandleSpawning(dt);
+            // Recompute freeze decisions before each advance so the front
+            // segment unfreezes when the player has destroyed enough marbles
+            // for the new flanks to form a match. (Tony 2026-05-21)
+            ReevaluateSeamFreeze();
             AdvanceChain(dt);
             UpdatePositions();
             ProcessPendingSeams();
             CheckEndConditions();
+        }
+
+        // Walks each pending seam, looks at the CURRENT flank colors, and
+        // refreshes FrozenAfterGap on the marbles head-side of that seam.
+        // Without this, the freeze state is stuck from the original destruction
+        // and the front never retreats even if a later destruction made a
+        // matching seam viable.
+        private void ReevaluateSeamFreeze()
+        {
+            // Clear all freeze flags; we'll reapply per current seam.
+            for (int i = 0; i < _marbles.Count; i++) _marbles[i].FrozenAfterGap = false;
+
+            for (int s = 0; s < _pendingSeams.Count; s++)
+            {
+                var headSide = _pendingSeams[s];
+                if (headSide == null) continue;
+                int idx = _marbles.IndexOf(headSide);
+                if (idx < 0 || idx + 1 >= _marbles.Count) continue;
+                var tailSide = _marbles[idx + 1];
+                if (!AreContiguous(headSide, tailSide)
+                    && ShouldFreezeFrontAfterDestruction(idx, idx, headSide, tailSide))
+                {
+                    for (int j = idx; j >= 0; j--) _marbles[j].FrozenAfterGap = true;
+                }
+            }
         }
 
         // -------------------- path effects --------------------

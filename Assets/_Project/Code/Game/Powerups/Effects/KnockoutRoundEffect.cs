@@ -47,6 +47,11 @@ namespace NovaSpark.Game.Powerups.Effects
             go.AddComponent<CircleCollider2D>();
             var p = go.AddComponent<Projectile>();
             p.Launch(dislodgedColor, dislodgeVelocity, radius, sprite, Context.Chain, resolver: null);
+            // Grace window so this secondary doesn't insta-collide with the
+            // chain marble immediately neighboring the dislodge point. At ~32
+            // u/s (player shot 18 * 1.8) we clear ~2.5 world units in 0.08s,
+            // safely past any adjacent chain marble.
+            p.SetCollisionDelay(0.08f);
 
             NotifyShotFired();
             return true;

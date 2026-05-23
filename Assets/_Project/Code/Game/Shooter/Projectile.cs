@@ -24,6 +24,10 @@ namespace NovaSpark.Game.Shooter
         private float _maxLifetime;
         private float _age;
         private bool _consumed;
+        // When > 0, OnCollisionEnter2D ignores incoming collisions. Used by
+        // Knockout Round so the dislodged secondary projectile doesn't insta-
+        // collide with the chain marble immediately behind the dislodge point.
+        private float _collisionDelayRemaining;
 
         public MarbleColor Color => _color;
 
@@ -59,9 +63,15 @@ namespace NovaSpark.Game.Shooter
             transform.localScale = Vector3.one * (radius * 2f);
         }
 
+        public void SetCollisionDelay(float seconds)
+        {
+            _collisionDelayRemaining = Mathf.Max(0f, seconds);
+        }
+
         private void Update()
         {
             _age += Time.deltaTime;
+            if (_collisionDelayRemaining > 0f) _collisionDelayRemaining -= Time.deltaTime;
             if (_age >= _maxLifetime) Destroy(gameObject);
         }
 
@@ -70,6 +80,10 @@ namespace NovaSpark.Game.Shooter
             // _consumed guard — Unity can deliver two collision events before
             // Destroy(gameObject) takes effect at end-of-frame.
             if (_consumed) return;
+            // Grace window so a freshly-spawned secondary projectile (Knockout)
+            // can clear the chain marble it just dislodged before being
+            // intercepted by its immediate neighbors.
+            if (_collisionDelayRemaining > 0f) return;
 
             // Powerup drop has priority — if the projectile hits one, that
             // consumes the shot. No chain insertion happens even if a chain
