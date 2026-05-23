@@ -20,7 +20,9 @@ namespace NovaSpark.Game.Powerups.Effects
 
         public override MarbleColor ModifyInsertColor(ChainMarble hit, MarbleColor color)
         {
-            return hit != null ? hit.Color : color;
+            if (hit == null) return color;
+            NotifyShotFired(); // charge consumed only on a real insert
+            return hit.Color;
         }
     }
 }

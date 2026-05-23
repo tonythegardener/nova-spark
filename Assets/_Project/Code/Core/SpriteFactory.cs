@@ -9,6 +9,8 @@ namespace NovaSpark.Core
         private static Sprite _snowflakeSprite;
         private static Sprite _crossSprite;
         private static Sprite _ringSprite;
+        private static Sprite _arrowSprite;
+        private static Sprite _starburstSprite;
 
         public static Sprite GetWhiteCircle()
         {
@@ -128,6 +130,127 @@ namespace NovaSpark.Core
 
             var sprite = Sprite.Create(tex, new Rect(0, 0, diameter, diameter),
                 new Vector2(0.5f, 0.5f), diameter);
+            sprite.hideFlags = HideFlags.HideAndDontSave;
+            return sprite;
+        }
+
+        // Filled rightward triangle / play-button arrow — used as the Knockout
+        // Round chambered marker. Rotates with the cannon barrel so it points
+        // in the aim direction.
+        public static Sprite GetWhiteArrow()
+        {
+            if (_arrowSprite != null) return _arrowSprite;
+            _arrowSprite = CreateArrowSprite(64);
+            return _arrowSprite;
+        }
+
+        public static Sprite CreateArrowSprite(int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+
+            float center = size * 0.5f;
+            // Arrow points UP (toward +Y in world space) so it aligns naturally
+            // with the cannon barrel's local up-axis (barrel rotates such that
+            // its top end points at the aim target).
+            float baseY = size * 0.18f;
+            float tipY  = size * 0.86f;
+            float baseHalfWidth = size * 0.34f;
+            float edge = 1.5f;
+
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float px = x - center + 0.5f;
+                    float py = y;
+
+                    byte a = 0;
+                    if (py >= baseY && py <= tipY)
+                    {
+                        float taper = (tipY - py) / (tipY - baseY);
+                        float allowedHalfWidth = baseHalfWidth * taper;
+                        float dist = allowedHalfWidth - Mathf.Abs(px);
+                        if (dist >= edge) a = 255;
+                        else if (dist > 0f) a = (byte)(Mathf.Clamp01(dist / edge) * 255f);
+                    }
+                    pixels[y * size + x] = new Color32(255, 255, 255, a);
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(false, true);
+
+            var sprite = Sprite.Create(tex, new Rect(0, 0, size, size),
+                new Vector2(0.5f, 0.5f), size);
+            sprite.hideFlags = HideFlags.HideAndDontSave;
+            return sprite;
+        }
+
+        // Central disc with 8 short radial spikes — used as the Explosive Round
+        // chambered marker.
+        public static Sprite GetWhiteStarburst()
+        {
+            if (_starburstSprite != null) return _starburstSprite;
+            _starburstSprite = CreateStarburstSprite(64);
+            return _starburstSprite;
+        }
+
+        public static Sprite CreateStarburstSprite(int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+
+            float center = size * 0.5f;
+            float innerR = size * 0.20f;          // central disc radius
+            float spikeR = size * 0.45f;          // tip radius for spikes
+            float spikeHalfThickness = size * 0.07f;
+            float edge = 1.0f;
+
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - center + 0.5f;
+                    float dy = y - center + 0.5f;
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+
+                    byte a = 0;
+                    if (dist <= innerR)
+                    {
+                        // Solid center disc
+                        a = 255;
+                    }
+                    else if (dist <= spikeR)
+                    {
+                        // 8 spikes at multiples of 45 degrees
+                        float angleDeg = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;
+                        if (angleDeg < 0f) angleDeg += 360f;
+                        float spokeMod = angleDeg % 45f;
+                        float spokeDist = Mathf.Min(spokeMod, 45f - spokeMod);
+                        float perpDist = dist * Mathf.Sin(spokeDist * Mathf.Deg2Rad);
+
+                        if (perpDist <= spikeHalfThickness) a = 255;
+                        else if (perpDist < spikeHalfThickness + edge)
+                            a = (byte)(Mathf.Clamp01((spikeHalfThickness + edge - perpDist) / edge) * 255f);
+                    }
+                    pixels[y * size + x] = new Color32(255, 255, 255, a);
+                }
+            }
+            tex.SetPixels32(pixels);
+            tex.Apply(false, true);
+
+            var sprite = Sprite.Create(tex, new Rect(0, 0, size, size),
+                new Vector2(0.5f, 0.5f), size);
             sprite.hideFlags = HideFlags.HideAndDontSave;
             return sprite;
         }

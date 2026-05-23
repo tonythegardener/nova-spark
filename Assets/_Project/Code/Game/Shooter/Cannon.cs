@@ -236,8 +236,12 @@ namespace NovaSpark.Game.Shooter
                 _equippedEffects[i].OnProjectileLaunched(go, chamberedColor, velocity);
             }
 
-            // Per-shot duration decrement (PerShots / OneUse).
-            for (int i = 0; i < _equippedEffects.Count; i++) _equippedEffects[i].NotifyShotFired();
+            // 1b.2d polish (Tony 2026-05-21): PerShots / OneUse charges are
+            // consumed on EFFECT ACTIVATION, not on blanket fire. Each handler
+            // effect calls NotifyShotFired itself when it actually does
+            // something (TryHandleProjectileHit returning true, Mimic's
+            // ModifyInsertColor on a real insert). Misses, drop pickups, and
+            // path-marble hits no longer waste charges.
 
             _shotQueue.RemoveAt(0);
             _shotQueue.Add(PickColor());

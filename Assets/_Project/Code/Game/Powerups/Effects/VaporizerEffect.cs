@@ -22,6 +22,7 @@ namespace NovaSpark.Game.Powerups.Effects
         {
             if (Context == null || Context.Chain == null || hit == null) return false;
             Context.Chain.DestroyMarble(hit);
+            NotifyShotFired();
             return true;
         }
     }
