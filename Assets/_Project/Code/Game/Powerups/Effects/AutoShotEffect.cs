@@ -15,7 +15,7 @@ namespace NovaSpark.Game.Powerups.Effects
         private const float DefaultIntervalSeconds = 0.25f;
         private static readonly Color s_teal = new Color(0.30f, 0.85f, 0.85f, 1f);
 
-        private IAutoShotStrategy _strategy = new ClosestTargetStrategy();
+        private IAutoShotStrategy _strategy = new MatchPriorityStrategy();
         private float _timeSinceLastShot;
 
         public override Color? BarrelTint => s_teal;
@@ -38,7 +38,7 @@ namespace NovaSpark.Game.Powerups.Effects
             _timeSinceLastShot += dt;
             if (_timeSinceLastShot < Interval) return;
 
-            var target = _strategy.PickTarget(Context.Chain, Context.Cannon);
+            var target = _strategy.PickTarget(Context.Chain, Context.Cannon, Context.Cannon.ChamberedColor);
             if (target == null) return; // chain empty (yet) — wait
 
             var origin = (Vector2)Context.Cannon.transform.position;

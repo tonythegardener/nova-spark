@@ -33,7 +33,11 @@ namespace NovaSpark.Editor
         public static void PrepareAssets()
         {
             EnsureLaserSightAsset();
-            EnsureRapidReloadAsset();
+            // Rapid Reload deferred (Tony 2026-05-22): base fire rate is
+            // already click-rate-limited so halving cooldown is imperceptible.
+            // Keep RapidReloadEffect + EnsureRapidReloadAsset around for a
+            // future redesign; just don't ship the asset in Phase 1.
+            // EnsureRapidReloadAsset();
             EnsureLongScopeAsset();
             EnsureMimicShotAsset();
             EnsureExplosiveRoundAsset();

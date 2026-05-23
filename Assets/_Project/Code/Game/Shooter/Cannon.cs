@@ -43,6 +43,10 @@ namespace NovaSpark.Game.Shooter
         // Exposed so the LevelController HUD can list active effects + timers.
         public IReadOnlyList<PowerupEffect> EquippedEffects => _equippedEffects;
 
+        // Color currently in the chamber (next-to-fire). Used by Auto Shot's
+        // strategy to pick same-color targets.
+        public MarbleColor ChamberedColor => _shotQueue.Count > 0 ? _shotQueue[0] : default;
+
         // When true, player input is suppressed and an equipped effect is
         // driving aim + fire (Auto Shot). The effect calls Fire(dir) directly
         // and rotates BarrelMuzzle each tick.
