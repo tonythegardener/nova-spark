@@ -28,6 +28,12 @@ namespace NovaSpark.Game.Shooter
         // Knockout Round so the dislodged secondary projectile doesn't insta-
         // collide with the chain marble immediately behind the dislodge point.
         private float _collisionDelayRemaining;
+        // The velocity we were launched with. Cached because Unity's physics
+        // resolution modifies _rb.linearVelocity before OnCollisionEnter2D
+        // fires (dampened / reflected against the marble surface). Knockout
+        // and the chain's side-of-insert detection both need the PRE-collision
+        // direction; reading _rb.linearVelocity gives garbage.
+        private Vector2 _launchVelocity;
 
         public MarbleColor Color => _color;
 
@@ -44,6 +50,7 @@ namespace NovaSpark.Game.Shooter
             _chain = chain;
             _resolver = resolver;
             _maxLifetime = maxLifetime;
+            _launchVelocity = velocity;
 
             _rb = GetComponent<Rigidbody2D>();
             _rb.bodyType = RigidbodyType2D.Dynamic;
@@ -101,7 +108,9 @@ namespace NovaSpark.Game.Shooter
             if (hit == null) return;
 
             _consumed = true;
-            var velocity = _rb != null ? _rb.linearVelocity : Vector2.zero;
+            // Use the cached launch velocity — Unity has already modified
+            // _rb.linearVelocity by the time OnCollisionEnter2D fires.
+            var velocity = _launchVelocity;
 
             if (_resolver != null)
             {
