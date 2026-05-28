@@ -5,25 +5,42 @@ using UnityEngine;
 
 namespace NovaSpark.Game.Powerups
 {
-    // Picks which marble Auto Shot aims at when it triggers a shot. Pluggable
-    // so strategies can be swapped without touching the effect class.
-    public interface IAutoShotStrategy
+    // Result of evaluating an Auto Shot target for one candidate firing color.
+    //   Quality 0 — no benefit (would graffiti a no-match color into the chain).
+    //   Quality 1 — pair-creation (single same-color marble; firing makes a pair).
+    //   Quality 2 — match-completion (same-color run of 2+; firing pops 3+).
+    public readonly struct AutoShotTarget
     {
-        ChainMarble PickTarget(MarbleChain chain, Cannon cannon, MarbleColor chamberedColor);
+        public readonly ChainMarble Marble;
+        public readonly int Quality;
+        public AutoShotTarget(ChainMarble marble, int quality)
+        {
+            Marble = marble;
+            Quality = quality;
+        }
+        public static readonly AutoShotTarget None = new AutoShotTarget(null, 0);
+        public bool IsBeneficial => Marble != null && Quality > 0;
     }
 
-    // Tony's call (2026-05-22): every Auto Shot should be beneficial.
-    // 1) Prefer existing same-color (as chambered) runs of 2+ — adding one
-    //    instantly completes the match.
-    // 2) Else any single same-color marble — sets up a future match.
-    // 3) Else fall back to the closest marble of any color so we don't stall.
+    // Picks a target for Auto Shot, given the color that will actually be fired.
+    // AutoShotEffect evaluates this against every visible queued color and rotates
+    // the queue to the slot with the best result.
+    public interface IAutoShotStrategy
+    {
+        AutoShotTarget Evaluate(MarbleChain chain, Cannon cannon, MarbleColor firingColor);
+    }
+
+    // Tony's call (2026-05-22, refined 2026-05-23 after testing): every Auto Shot
+    // must be beneficial — never insert a no-match color into the chain. If no
+    // queue color has a beneficial target, AutoShotEffect holds the shot rather
+    // than spraying random colors.
     public sealed class MatchPriorityStrategy : IAutoShotStrategy
     {
-        public ChainMarble PickTarget(MarbleChain chain, Cannon cannon, MarbleColor chamberedColor)
+        public AutoShotTarget Evaluate(MarbleChain chain, Cannon cannon, MarbleColor firingColor)
         {
-            if (chain == null || cannon == null) return null;
+            if (chain == null || cannon == null) return AutoShotTarget.None;
             var marbles = chain.Marbles;
-            if (marbles.Count == 0) return null;
+            if (marbles.Count == 0) return AutoShotTarget.None;
             Vector2 origin = cannon.transform.position;
 
             // Pass 1: same-color runs of 2+ (instant-match targets).
@@ -32,13 +49,13 @@ namespace NovaSpark.Game.Powerups
             int i = 0;
             while (i < marbles.Count)
             {
-                if (marbles[i] != null && marbles[i].Color == chamberedColor)
+                if (marbles[i] != null && marbles[i].Color == firingColor)
                 {
                     int runStart = i;
                     int runEnd = i;
                     while (runEnd + 1 < marbles.Count
                            && marbles[runEnd + 1] != null
-                           && marbles[runEnd + 1].Color == chamberedColor)
+                           && marbles[runEnd + 1].Color == firingColor)
                     {
                         runEnd++;
                     }
@@ -62,14 +79,14 @@ namespace NovaSpark.Game.Powerups
                     i++;
                 }
             }
-            if (bestRunMember != null) return bestRunMember;
+            if (bestRunMember != null) return new AutoShotTarget(bestRunMember, 2);
 
             // Pass 2: any single same-color marble (sets up a future match).
             ChainMarble bestSingle = null;
             float bestSingleDist = float.MaxValue;
             for (int j = 0; j < marbles.Count; j++)
             {
-                if (marbles[j] != null && marbles[j].Color == chamberedColor)
+                if (marbles[j] != null && marbles[j].Color == firingColor)
                 {
                     float d = ((Vector2)marbles[j].transform.position - origin).sqrMagnitude;
                     if (d < bestSingleDist)
@@ -79,21 +96,22 @@ namespace NovaSpark.Game.Powerups
                     }
                 }
             }
-            if (bestSingle != null) return bestSingle;
+            if (bestSingle != null) return new AutoShotTarget(bestSingle, 1);
 
-            // Pass 3: closest of any color (fallback so Auto Shot doesn't stall).
-            return NearestStrategy.PickNearestAnyColor(marbles, origin);
+            return AutoShotTarget.None;
         }
     }
 
-    // Color-blind nearest strategy. Kept as a baseline alternative + as the
-    // fallback helper for MatchPriorityStrategy.
+    // Color-blind nearest strategy. Baseline alternative — picks the closest
+    // marble of any color and reports Quality 0 (not beneficial). Kept for
+    // comparison and as a shared helper.
     public sealed class NearestStrategy : IAutoShotStrategy
     {
-        public ChainMarble PickTarget(MarbleChain chain, Cannon cannon, MarbleColor chamberedColor)
+        public AutoShotTarget Evaluate(MarbleChain chain, Cannon cannon, MarbleColor firingColor)
         {
-            if (chain == null || cannon == null) return null;
-            return PickNearestAnyColor(chain.Marbles, cannon.transform.position);
+            if (chain == null || cannon == null) return AutoShotTarget.None;
+            var pick = PickNearestAnyColor(chain.Marbles, cannon.transform.position);
+            return pick != null ? new AutoShotTarget(pick, 0) : AutoShotTarget.None;
         }
 
         public static ChainMarble PickNearestAnyColor(System.Collections.Generic.IReadOnlyList<ChainMarble> marbles, Vector2 origin)

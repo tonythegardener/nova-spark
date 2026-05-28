@@ -47,6 +47,19 @@ namespace NovaSpark.Game.Shooter
         // strategy to pick same-color targets.
         public MarbleColor ChamberedColor => _shotQueue.Count > 0 ? _shotQueue[0] : default;
 
+        // Visible portion of the shot queue (chamber + previews). Auto Shot
+        // scans these to choose the best color to fire next.
+        public int VisibleShotQueueLength
+        {
+            get
+            {
+                int len = 1 + _previewRenderers.Count;
+                if (len > _shotQueue.Count) len = _shotQueue.Count;
+                return len;
+            }
+        }
+        public MarbleColor GetShotQueueColor(int index) => _shotQueue[index];
+
         // When true, player input is suppressed and an equipped effect is
         // driving aim + fire (Auto Shot). The effect calls Fire(dir) directly
         // and rotates BarrelMuzzle each tick.
@@ -215,7 +228,8 @@ namespace NovaSpark.Game.Shooter
         // to the end of the visible portion; everything else shifts forward one.
         // Player can cycle to any visible color into the chamber with N taps,
         // preserving the rest of the order so planned sequences still hold.
-        private void RotateShotQueue()
+        // Public so Auto Shot can chamber its preferred color before firing.
+        public void RotateShotQueue()
         {
             int visibleLen = 1 + _previewRenderers.Count; // chambered + previews
             if (visibleLen < 2 || _shotQueue.Count < visibleLen) return;
