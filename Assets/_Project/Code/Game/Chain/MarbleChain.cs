@@ -19,13 +19,13 @@ namespace NovaSpark.Game.Chain
         private float _spawnTimer;
         private bool _spawnComplete;
 
-        // Match detection is event-driven (Phase 1a.3):
+        // Match detection is event-driven:
         // - TryInsertAt: directly runs a local match check around the inserted marble.
         // - DestroyRunAround: when it destroys a run flanked by surviving marbles,
         //   it records a "pending seam" — the head-side surviving marble. Each Tick
         //   we check pending seams; once the gap from a destruction has closed and
         //   the two flanking marbles touch, we re-run a local match check there.
-        //   That preserves Zuma-style cascades while never auto-eliminating
+        //   That preserves cascades while never auto-eliminating
         //   spawn-time runs of >= MatchThreshold same-color marbles.
         private readonly List<ChainMarble> _pendingSeams = new();
 
@@ -44,7 +44,7 @@ namespace NovaSpark.Game.Chain
         private readonly HashSet<MarbleColor> _activeColorsScratch = new();
 
         // Active path-effects currently applied to the chain. Key = effectKind
-        // so same-key applies extend duration (Tony 2026-05-21 rule). Effective
+        // so same-key applies extend duration. Effective
         // speed multiplier is the product of all active multipliers.
         public struct ActivePathEffect
         {
@@ -86,7 +86,7 @@ namespace NovaSpark.Game.Chain
             HandleSpawning(dt);
             // Recompute freeze decisions before each advance so the front
             // segment unfreezes when the player has destroyed enough marbles
-            // for the new flanks to form a match. (Tony 2026-05-21)
+            // for the new flanks to form a match.
             ReevaluateSeamFreeze();
             AdvanceChain(dt);
             UpdatePositions();
@@ -112,7 +112,7 @@ namespace NovaSpark.Game.Chain
                 if (idx < 0 || idx + 1 >= _marbles.Count) continue;
                 var tailSide = _marbles[idx + 1];
                 if (!AreContiguous(headSide, tailSide)
-                    && ShouldFreezeFrontAfterDestruction(idx, idx, headSide, tailSide))
+                    && ShouldFreezeAtSeam(idx, idx + 1))
                 {
                     for (int j = idx; j >= 0; j--) _marbles[j].FrozenAfterGap = true;
                 }
@@ -223,9 +223,8 @@ namespace NovaSpark.Game.Chain
 
         // Helper called whenever a chain marble is destroyed via any path. If
         // the marble carries a SpecialPowerup tag, apply its path effect before
-        // the destruction completes. Tony 2026-05-21: collateral destruction
-        // (Explosive radius, match cascade, Vaporize, etc.) should ALSO trigger
-        // the effect — not just direct hits.
+        // the destruction completes. Collateral destruction (Explosive radius,
+        // match cascade, Vaporize, etc.) triggers the effect, not just direct hits.
         private void ActivateSpecialPowerup(ChainMarble marble, string source)
         {
             if (marble == null || marble.SpecialPowerup == null) return;
@@ -312,13 +311,13 @@ namespace NovaSpark.Game.Chain
 
         // -------------------- advance --------------------
 
-        // Phase 1a model: spawn pressure drives the chain from the TAIL.
+        // Spawn pressure drives the chain from the TAIL.
         // The tail (last spawned, lowest arc) advances at ChainAdvanceSpeed.
         // Each marble closer to the head has a natural arc = trailing.arc + spacing.
         // - If current <= natural, snap forward (spawn pressure pushing). Clears the
         //   frozen flag because the gap has closed.
-        // - If current > natural and the marble is FROZEN (Phase 1b.2b rule:
-        //   destruction left flanks that wouldn't form a match), HOLD position so
+        // - If current > natural and the marble is FROZEN (destruction left flanks
+        //   that wouldn't form a match), HOLD position so
         //   the gap stays open and the back catches up.
         // - Otherwise retreat at CatchUpSpeedMultiplier * speed (same-color flanks
         //   closing into a match).
@@ -438,18 +437,17 @@ namespace NovaSpark.Game.Chain
 
         // Destroys marbles [L..R] inclusive. If both flanks survive, records the
         // head-side surviving marble as a pending seam so a future Tick can
-        // recheck once the gap closes (Zuma cascade behavior).
-        // Phase 1b.2b: also decides whether to FREEZE the front segment based on
-        // whether retreating would form a same-color run >= MatchThreshold.
-        // Phase 1b.2d: activates any SpecialPowerup tags on destroyed marbles
-        // (collateral activation) unless caller asks to skip (OnPathMarbleHit).
+        // recheck once the gap closes (cascade behavior). Also decides whether to
+        // FREEZE the front segment based on whether retreating would form a
+        // same-color run >= MatchThreshold, and activates any SpecialPowerup tags
+        // on destroyed marbles unless the caller asks to skip (OnPathMarbleHit).
         private void DestroyRange(int L, int R, bool activateSpecials = true)
         {
             ChainMarble headSideSurvivor = L > 0 ? _marbles[L - 1] : null;
             bool tailSideSurvivorExists = R < _marbles.Count - 1;
             ChainMarble tailSideSurvivor = tailSideSurvivorExists ? _marbles[R + 1] : null;
 
-            bool shouldFreeze = ShouldFreezeFrontAfterDestruction(L, R, headSideSurvivor, tailSideSurvivor);
+            bool shouldFreeze = ShouldFreezeAtSeam(L - 1, R + 1);
 
             if (activateSpecials)
             {
@@ -474,28 +472,15 @@ namespace NovaSpark.Game.Chain
             OnChainChanged?.Invoke();
         }
 
-        // Returns true if the destruction should freeze the front segment in place
-        // (because retreating wouldn't form a match), false if the front should
-        // retreat to close the gap and form a cascade match.
-        // Called BEFORE the destruction so indices L-1 and R+1 still reference the
-        // surviving flanks at their pre-destruction positions.
-        private bool ShouldFreezeFrontAfterDestruction(int L, int R, ChainMarble headFlank, ChainMarble tailFlank)
+        // Returns true if the front segment should hold in place (retreating wouldn't
+        // form a match), false if it should retreat to close the gap and cascade.
+        // Takes the indices of the two marbles flanking the seam, so it works both
+        // before a destruction (L-1, R+1) and after one (idx, idx+1).
+        private bool ShouldFreezeAtSeam(int headFlankIdx, int tailFlankIdx)
         {
-            if (headFlank == null || tailFlank == null) return false; // no flank to freeze against
-            if (headFlank.Color != tailFlank.Color) return true;       // can't form a match
-            int totalRun = CountFlankColorRun(L - 1, R + 1, headFlank.Color);
-            return totalRun < _level.MatchThreshold;                   // not enough for a match
-        }
-
-        // Counts contiguous same-color marbles walking outward from both flanks of
-        // a (yet-to-be-destroyed) range. Used to predict if a retreat would form
-        // a match >= MatchThreshold.
-        private int CountFlankColorRun(int headFlankIdx, int tailFlankIdx, MarbleColor color)
-        {
-            int count = 0;
-            for (int i = headFlankIdx; i >= 0 && _marbles[i].Color == color; i--) count++;
-            for (int i = tailFlankIdx; i < _marbles.Count && _marbles[i].Color == color; i++) count++;
-            return count;
+            if (headFlankIdx < 0 || tailFlankIdx >= _marbles.Count) return false; // no flank to freeze against
+            return SeamRules.ShouldFreeze(
+                _marbles.Count, i => _marbles[i].Color, headFlankIdx, tailFlankIdx, _level.MatchThreshold);
         }
 
         // Marks the head-side surviving marble and everything ahead of it (lower
@@ -612,7 +597,7 @@ namespace NovaSpark.Game.Chain
             MaybeRegisterSeamWithFreeze(rangeStart, rangeEnd);
 
             // Activate any special path-marbles that are about to be destroyed
-            // by the blast (collateral activation — Tony 2026-05-21).
+            // by the blast (collateral activation).
             for (int i = 0; i < toRemove.Count; i++)
             {
                 ActivateSpecialPowerup(_marbles[toRemove[i]], "collateral (explosive)");
@@ -642,7 +627,7 @@ namespace NovaSpark.Game.Chain
             if (headSide == null || tailSide == null) return;
 
             _pendingSeams.Add(headSide);
-            if (ShouldFreezeFrontAfterDestruction(rangeStart, rangeEnd, headSide, tailSide))
+            if (ShouldFreezeAtSeam(rangeStart - 1, rangeEnd + 1))
             {
                 FreezeSegmentBackFrom(headSide);
             }
@@ -660,8 +645,7 @@ namespace NovaSpark.Game.Chain
             ChainMarble headSide = idx > 0 ? _marbles[idx - 1] : null;
             ChainMarble tailSide = idx + 1 < _marbles.Count ? _marbles[idx + 1] : null;
             bool tailExists = tailSide != null;
-            bool shouldFreeze = headSide != null && tailSide != null
-                && ShouldFreezeFrontAfterDestruction(idx, idx, headSide, tailSide);
+            bool shouldFreeze = ShouldFreezeAtSeam(idx - 1, idx + 1);
 
             // Don't fire OnMarbleDestroyed — the marble isn't really "destroyed",
             // it's being launched. Knockout will eventually settle it elsewhere
