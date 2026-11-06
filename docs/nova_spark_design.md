@@ -1,7 +1,7 @@
 # Nova Spark — Game Design Document
 *Working title.*
 
-> **Status:** Pre-production. This document is the source of truth for design decisions. Update as decisions firm up; tag open questions with `[OPEN]`.
+> **Status:** Early prototype. This document describes the intended game, and most of it isn't built yet; see section 15 for current progress. It is the source of truth for design decisions. Update as decisions firm up; tag open questions with `[OPEN]`.
 
 ---
 
@@ -10,7 +10,7 @@
 A modern, real-time marble shooter with a Space Invaders themed skin, a Zuma-style advancing chain of colored spheres to be matched by shooter, and a roguelike build-crafting layer inspired by Balatro and Slay the Spire. Tower defense elements *support* the shooter — they don't replace it. The marble shooter is the hero mechanic.
 
 **Pitch:** "Zuma meets Space Invaders, with a roguelike draft layer." 
-**Story:(Loose)** You are a lone defender outpost on the edge of your factions space defending against on oncoming alien invasion. You need to hold the line while reinforcements arrive. You have a weapon printer, but it was poorly maintained so it randomly generates the weapons you need. Each weapon uniquely counters specific ship class (marble colors) when clustered but doesn't effect the other ship types  directly (the point of color matching to remove). However, when those ships are destroyed, it can cause chain reactions to other ships if surround by the same class. I.e.  Loose reasoning for chained marble eliminations when colors match after an internal set is eliminated. Maybe some thematic elements in the story similar to being a "last star fighter". Can be cheesy and not take itself seriously. "All your base are belong to us" fits. 
+**Story (loose):** You are a lone defender outpost on the edge of your faction's space, defending against an oncoming alien invasion. You need to hold the line while reinforcements arrive. You have a weapon printer, but it was poorly maintained, so it randomly generates the weapons you need. Each weapon uniquely counters a specific ship class (marble color) when clustered but doesn't affect the other ship types directly (the reason color matching removes marbles). When those ships are destroyed, they can cause chain reactions in other ships if surrounded by the same class, which is the loose reasoning for chained eliminations when colors match after an internal set is eliminated. The tone can borrow from "The Last Starfighter": cheesy, and not taking itself seriously. "All your base are belong to us" fits.
 
 **Target platform:** PC first (Windows primary, Linux/SteamOS as a follow-on). Distribution via Steam.
 
@@ -121,6 +121,8 @@ Towers occupy **fixed slots** along the path. Each run, drafted towers are assig
 ## 8. Shooter Power-Ups
 
 Shooter mods alter what comes out of the cannon, how it aims, or what the player sees. These are the bulk of the draft pool.
+
+This is the target list, not what exists today. Built so far: Laser Sight, Long Scope, Explosive Round, Chrono Field (currently triggered by destroying a marked chain marble rather than as an active ability), plus Mimic Shot, Vaporizer, Knockout Round and Auto Shot, which came out of prototyping and aren't listed below. Rapid Reload was cut for now: base fire rate is already limited by click speed, so a shorter cooldown wasn't noticeable.
 
 ### Aim & Fire
 
@@ -332,6 +334,8 @@ All content is data, not code. Power-ups, towers, ship types, levels, themes all
 ---
 
 ## 15. Development Roadmap
+
+**Current progress:** Phases 0a and 0b are done. Phase 1 is in progress: three levels and eight power-ups are playable, the draft screen exists but doesn't trigger yet, and towers and the node map haven't been started.
 
 ### Phase 0a — Project Skeleton
 Mechanical setup. No gameplay yet.
