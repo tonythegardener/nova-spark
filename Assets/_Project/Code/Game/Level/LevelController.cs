@@ -202,7 +202,7 @@ namespace NovaSpark.Game.Level
             _shooter = shooterGo.AddComponent<Cannon>();
             _shooter.Configure(_level, _chain, _camera, _circle);
 
-            // 1b.2c: cannon starts naked. Powerups arrive via in-level drops.
+            // Cannon starts with nothing equipped. Powerups arrive via in-level drops.
             _ctx = new PowerupContext(_level, _chain, _camera, _shooter, _shooter.BarrelMuzzle);
         }
 
@@ -288,7 +288,7 @@ namespace NovaSpark.Game.Level
             if (_state != AppState.Playing) return;
             _state = AppState.Lost;
             if (_shooter != null) _shooter.SetFiringEnabled(false);
-            // Single-loss = run end (Tony 2026-05-21).
+            // A single loss ends the run.
             RunState.OnLevelLost();
         }
 
@@ -429,7 +429,7 @@ namespace NovaSpark.Game.Level
             int y = (int)boxRect.y + 110;
             foreach (var lv in levels)
             {
-                var label = $"{lv.DisplayName}\n<size=12>{lv.ContentId}</size>";
+                var label = lv.DisplayName;
                 var btnRect = new Rect(boxRect.x + 30, y, boxRect.width - 60, rowH);
                 if (GUI.Button(btnRect, label, _buttonStyle))
                 {
@@ -477,7 +477,7 @@ namespace NovaSpark.Game.Level
             by += btnH + gap;
             if (GUI.Button(new Rect(bx, by, btnW, btnH), "Quit to Level Select", _buttonStyle))
             {
-                // Keeps the run alive (Tony 2026-05-21). Run pool persists.
+                // Keeps the run alive; the run pool persists.
                 GoToLevelSelect();
             }
             by += btnH + 14;

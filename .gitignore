@@ -115,3 +115,6 @@ desktop.ini
 
 # Claude Code local per-machine settings (don't commit)
 .claude/settings.local.json
+
+# Editor settings (Unity regenerates these per checkout)
+.vscode/

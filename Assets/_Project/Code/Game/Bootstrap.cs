@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace NovaSpark.Game
 {
-    // Phase 0 content-loading choice: ScriptableObject instances live under
+    // Content loading: ScriptableObject instances live under
     // Assets/_Project/Content/Resources/<Type>/ so Resources.LoadAll<T> finds them
     // in player builds without an Addressables dependency. Will be revisited if/when
     // Addressables or runtime JSON mod loading becomes necessary.
@@ -20,9 +20,8 @@ namespace NovaSpark.Game
             InitializeRunStateMetaPool();
         }
 
-        // Seed RunState.metaPool with every PowerupDefinition we have. For
-        // Phase 1 this is "everything that exists"; meta unlocks in Phase 4 will
-        // gate which definitions count as "unlocked" for the player.
+        // Seed RunState.metaPool with every PowerupDefinition we have. Once
+        // meta-progression exists, unlocks will gate which definitions count.
         private static void InitializeRunStateMetaPool()
         {
             RunState.InitializeMetaPool(ContentRegistry.All<PowerupDefinition>());

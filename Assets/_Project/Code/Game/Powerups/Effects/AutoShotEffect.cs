@@ -13,7 +13,7 @@ namespace NovaSpark.Game.Powerups.Effects
     // target) pair with the highest match quality. If a non-chambered color
     // wins, we rotate the queue to chamber it before firing. If NO queue
     // color has a beneficial target, we hold the shot rather than spray a
-    // no-match color into the chain (Tony 2026-05-23).
+    // no-match color into the chain.
     //
     // Magnitude = seconds between auto-shots (default 0.25).
     public sealed class AutoShotEffect : PowerupEffect

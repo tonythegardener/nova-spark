@@ -9,14 +9,14 @@ namespace NovaSpark.Run
     //
     // Two pools:
     //   - metaPool: every powerup the player has unlocked at meta-progression
-    //     level. For Phase 1 this is just "every registered PowerupDefinition";
-    //     real meta unlocks land in Phase 4.
+    //     level. For now this is every registered PowerupDefinition; meta
+    //     unlocks aren't built yet.
     //   - runPool: subset of metaPool active in THIS run. Drops draw from here.
     //     Drafts between levels add new items from metaPool into runPool.
     //
-    // Phase 1 starter rule (Tony 2026-05-21): on StartNewRun, runPool is seeded
-    // with the full metaPool so drops can happen from level 1. Drafts will only
-    // become meaningful once metaPool > runPool (meta unlocks in Phase 4).
+    // Current starter rule: on StartNewRun, runPool is seeded with the full
+    // metaPool so drops can happen from level 1. This means the between-level
+    // draft has nothing to offer until metaPool is larger than runPool.
     public static class RunState
     {
         private static readonly List<PowerupDefinition> _metaPool = new();
@@ -41,7 +41,7 @@ namespace NovaSpark.Run
         public static void StartNewRun()
         {
             _runPool.Clear();
-            _runPool.AddRange(_metaPool); // Phase 1 starter rule
+            _runPool.AddRange(_metaPool); // starter rule, see class comment
             LevelsWon = 0;
             CurrentLevelContentId = null;
             RunActive = true;
@@ -65,7 +65,7 @@ namespace NovaSpark.Run
 
         public static void OnLevelWon() => LevelsWon++;
 
-        // Single-loss = run end (Tony's call).
+        // A single loss ends the run.
         public static void OnLevelLost() => EndRun();
 
         public static void AddToRunPool(PowerupDefinition def)

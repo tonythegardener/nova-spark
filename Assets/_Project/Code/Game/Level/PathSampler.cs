@@ -32,7 +32,7 @@ namespace NovaSpark.Game.Level
         {
             // Lead-in extrapolation: negative arcs extend behind path[0] along
             // the reverse of (path[0] -> path[1]) so chain spawns can sit
-            // off-screen and march into the visible portion. (Tony 2026-05-21)
+            // off-screen and march into the visible portion.
             if (arcLength < 0f && _points.Length >= 2)
             {
                 var dir = _points[1] - _points[0];

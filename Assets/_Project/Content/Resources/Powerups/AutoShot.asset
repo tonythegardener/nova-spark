@@ -15,8 +15,8 @@ MonoBehaviour:
   contentId: powerup.auto_shot
   schemaVersion: 1
   displayName: Auto Shot
-  description: 'Cannon takes over briefly: auto-aims at the nearest target and fires
-    a short burst.'
+  description: 'Cannon takes over briefly: picks the most useful target for your queued
+    shots and fires a short burst.'
   icon: {fileID: 0}
   effectKind: auto_shot
   kind: 0

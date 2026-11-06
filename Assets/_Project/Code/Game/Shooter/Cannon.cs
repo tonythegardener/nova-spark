@@ -103,7 +103,7 @@ namespace NovaSpark.Game.Shooter
             var effect = PowerupEffects.Create(def.EffectKind);
             if (effect == null) return;
 
-            // Max-1 Shooter rule (Tony 2026-05-21). Picking up a new Shooter-type
+            // Max-1 Shooter rule. Picking up a new Shooter-type
             // unequips the current one. Path-type effects stack freely.
             if (def.Kind == PowerupKind.Shooter)
             {
@@ -224,7 +224,7 @@ namespace NovaSpark.Game.Shooter
             return false;
         }
 
-        // 1b.2a: swap is now a ROTATE through the visible queue. Chambered moves
+        // Swap ROTATES through the visible queue. Chambered moves
         // to the end of the visible portion; everything else shifts forward one.
         // Player can cycle to any visible color into the chamber with N taps,
         // preserving the rest of the order so planned sequences still hold.
@@ -282,12 +282,12 @@ namespace NovaSpark.Game.Shooter
                 _equippedEffects[i].OnProjectileLaunched(go, chamberedColor, velocity);
             }
 
-            // 1b.2d polish (Tony 2026-05-21): PerShots / OneUse charges are
+            // PerShots / OneUse charges are
             // consumed on EFFECT ACTIVATION, not on blanket fire. Each handler
             // effect calls NotifyShotFired itself when it actually does
             // something (TryHandleProjectileHit returning true, Mimic's
             // ModifyInsertColor on a real insert). Misses, drop pickups, and
-            // path-marble hits no longer waste charges.
+            // path-marble hits don't waste charges.
 
             _shotQueue.RemoveAt(0);
             _shotQueue.Add(PickColor());

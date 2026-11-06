@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0076268964279ab41b4ee4a81438e75c, type: 3}
-  m_Name: Phase0bSmokeTest
+  m_Name: GentleS
   m_EditorClassIdentifier: NovaSpark.Game::NovaSpark.Game.Level.LevelDefinition
-  contentId: level.phase0b_smoke_test
+  contentId: level.gentle_s
   schemaVersion: 1
-  displayName: "Phase 0b \u2014 Smoke Test"
+  displayName: Gentle S
   waypoints:
   - {x: -8.5, y: 3.5}
   - {x: -3, y: 3.5}

@@ -92,7 +92,7 @@ namespace NovaSpark.Game.Chain
         // Icon sits ON the marble (front), pulses scale gently. Per effectKind:
         //   chrono_field -> snowflake
         //   (others fall back to a small white ring placeholder until each gets
-        //    its own icon — Tony 2026-05-21)
+        //    its own icon)
         private void BuildSpecialIcon(int sortingOrder)
         {
             Sprite icon;

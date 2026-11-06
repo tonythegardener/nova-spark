@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: NovaSpark.Game::NovaSpark.Game.Level.LevelDefinition
   contentId: level.long_sweep
   schemaVersion: 1
-  displayName: Long Sweep (wide arc)
+  displayName: Long Sweep
   waypoints:
   - {x: -10, y: -1}
   - {x: -9.5, y: 2}

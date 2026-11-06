@@ -38,7 +38,7 @@ namespace NovaSpark.Powerups
 
         [Header("Effect")]
         [Tooltip("String key resolved by NovaSpark.Game.Powerups.PowerupEffects.Create. " +
-                 "Examples: laser_sight, rapid_reload, long_scope, mimic_shot, explosive_round, vaporizer, knockout.")]
+                 "Examples: laser_sight, long_scope, mimic_shot, explosive_round, vaporizer, knockout.")]
         [SerializeField] private string effectKind = "";
         [Tooltip("Shooter modifies the cannon (max 1 equipped). Path modifies the chain (stacks).")]
         [SerializeField] private PowerupKind kind = PowerupKind.Shooter;

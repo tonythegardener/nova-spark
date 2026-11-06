@@ -30,8 +30,7 @@ namespace NovaSpark.Game.Powerups
         AutoShotTarget Evaluate(MarbleChain chain, Cannon cannon, MarbleColor firingColor);
     }
 
-    // Tony's call (2026-05-22, refined 2026-05-23 after testing): every Auto Shot
-    // must be beneficial — never insert a no-match color into the chain. If no
+    // Every Auto Shot must be beneficial — never insert a no-match color into the chain. If no
     // queue color has a beneficial target, AutoShotEffect holds the shot rather
     // than spraying random colors.
     public sealed class MatchPriorityStrategy : IAutoShotStrategy

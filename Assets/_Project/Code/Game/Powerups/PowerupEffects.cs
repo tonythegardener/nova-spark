@@ -14,7 +14,6 @@ namespace NovaSpark.Game.Powerups
             switch (effectKind)
             {
                 case "laser_sight":     return new LaserSightEffect();
-                case "rapid_reload":    return new RapidReloadEffect();
                 case "long_scope":      return new LongScopeEffect();
                 case "mimic_shot":      return new MimicShotEffect();
                 case "explosive_round": return new ExplosiveRoundEffect();

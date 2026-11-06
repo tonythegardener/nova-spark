@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: NovaSpark.Game::NovaSpark.Game.Level.LevelDefinition
   contentId: level.switchback
   schemaVersion: 1
-  displayName: Switchback (sharp Z)
+  displayName: Switchback
   waypoints:
   - {x: -9, y: 3.5}
   - {x: 4, y: 3.5}
