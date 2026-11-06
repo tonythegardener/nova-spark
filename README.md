@@ -2,7 +2,9 @@
 
 A real-time marble shooter with a roguelike layer, built in Unity 6.
 
-> **Work in progress, very early stage.** The core shooting and chain mechanics are playable, but the game doesn't look the way it's meant to yet. All art is placeholder shapes, there is no audio, and the space theme described below isn't visible in the game so far.
+> **Work in progress, very early stage.** The game uses simplified graphics for now while the mechanics are being worked on, so there are no screenshots yet. All art is placeholder shapes, there is no audio, and the space theme described below isn't visible in the game so far.
+>
+> A downloadable Windows build is planned but isn't available at this stage. For now, you can run the game from source in Unity.
 
 An advancing chain of colored marbles moves along a path toward your base. You aim a fixed cannon and fire colored shots into the chain, and three or more of the same color destroy each other. If the chain reaches the end of the path, you lose.
 
